@@ -2,12 +2,11 @@
 const CACHE_NAME = 'orders-app-v1';
 const API_CACHE_NAME = 'api-cache-v1';
 
-// Cache static assets
+// Cache static assets (only production assets)
 const STATIC_ASSETS = [
   '/',
-  '/src/main.tsx',
-  '/src/App.tsx',
-  '/src/pages/OrdersPage.tsx'
+  '/index.html',
+  '/vite.svg'
 ];
 
 // API endpoints to cache
@@ -46,6 +45,15 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // Skip development files completely
+  if (url.pathname.startsWith('/src/') || 
+      url.pathname.includes('.tsx') || 
+      url.pathname.includes('.ts') ||
+      url.pathname.includes('@vite') ||
+      url.pathname.includes('@react-refresh')) {
+    return; // Let the browser handle these requests normally
+  }
+
   // Handle API requests with cache-first strategy for GET requests
   if (url.pathname.includes('/api/') && request.method === 'GET') {
     event.respondWith(
@@ -77,10 +85,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Handle static assets with cache-first strategy
-  event.respondWith(
-    caches.match(request).then((cachedResponse) => {
-      return cachedResponse || fetch(request);
-    })
-  );
+  // Handle static assets with cache-first strategy (only for production assets)
+  if (STATIC_ASSETS.includes(url.pathname)) {
+    event.respondWith(
+      caches.match(request).then((cachedResponse) => {
+        return cachedResponse || fetch(request);
+      })
+    );
+  }
 });
