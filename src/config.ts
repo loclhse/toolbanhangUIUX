@@ -8,6 +8,9 @@ export const API_BASE_URL = isDevelopment
   ? 'http://103.90.227.18'  // Use production API for now
   : 'http://103.90.227.18';
 
-export const WS_BASE_URL = "http://103.90.227.18:8081";
+export const WS_BASE_URLS = [
+  "http://103.90.227.18:8081",
+  "http://103.90.227.18:8082"
+];
 
 
