@@ -180,8 +180,38 @@ const OrderModal: React.FC<OrderModalProps> = ({ open, tableId, tableIds = [], o
         </div>
 
         {loading ? (
-          <div style={{ fontSize: 16, color: '#1976d2', margin: '32px 0', textAlign: 'center' }}>
-            Đang tải thực đơn...
+          <div style={{ margin: '32px 0', textAlign: 'center' }}>
+            {/* Skeleton Loader */}
+            <style>{`
+              @keyframes skeleton-shimmer {
+                0% { background-position: -400px 0; }
+                100% { background-position: 400px 0; }
+              }
+              .skeleton {
+                background: #f0f0f0;
+                border-radius: 8px;
+                position: relative;
+                overflow: hidden;
+              }
+              .skeleton.shimmer::after {
+                content: '';
+                position: absolute;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.5) 50%, rgba(255,255,255,0) 100%);
+                animation: skeleton-shimmer 1.2s infinite;
+              }
+            `}</style>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24, alignItems: 'center', marginTop: 32 }}>
+              {[1,2,3,4].map(i => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', width: 320, gap: 16 }}>
+                  <div className="skeleton shimmer" style={{ width: 64, height: 64, borderRadius: '50%' }} />
+                  <div style={{ flex: 1 }}>
+                    <div className="skeleton shimmer" style={{ width: '80%', height: 18, marginBottom: 10 }} />
+                    <div className="skeleton shimmer" style={{ width: '60%', height: 14 }} />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         ) : error ? (
           <div style={{ color: 'red', fontSize: 14, padding: '12px', background: '#ffebee', borderRadius: 6 }}>
@@ -198,6 +228,20 @@ const OrderModal: React.FC<OrderModalProps> = ({ open, tableId, tableIds = [], o
                   style={styles.peopleBtn}
                   onClick={() => setNumberOfPeople(Math.max(1, numberOfPeople - 1))}
                   disabled={submitting || numberOfPeople <= 1}
+                  onMouseOver={e => {
+                    if (!(submitting || numberOfPeople <= 1)) {
+                      e.currentTarget.style.background = '#ff9800';
+                      e.currentTarget.style.color = '#fff';
+                      e.currentTarget.style.transform = 'scale(1.05)';
+                    }
+                  }}
+                  onMouseOut={e => {
+                    if (!(submitting || numberOfPeople <= 1)) {
+                      e.currentTarget.style.background = '#fff';
+                      e.currentTarget.style.color = '#ff9800';
+                      e.currentTarget.style.transform = 'scale(1)';
+                    }
+                  }}
                 >
                   -
                 </button>
@@ -207,32 +251,27 @@ const OrderModal: React.FC<OrderModalProps> = ({ open, tableId, tableIds = [], o
                   style={styles.peopleBtn}
                   onClick={() => setNumberOfPeople(numberOfPeople + 1)}
                   disabled={submitting}
+                  onMouseOver={e => {
+                    if (!submitting) {
+                      e.currentTarget.style.background = '#ff9800';
+                      e.currentTarget.style.color = '#fff';
+                      e.currentTarget.style.transform = 'scale(1.05)';
+                    }
+                  }}
+                  onMouseOut={e => {
+                    if (!submitting) {
+                      e.currentTarget.style.background = '#fff';
+                      e.currentTarget.style.color = '#ff9800';
+                      e.currentTarget.style.transform = 'scale(1)';
+                    }
+                  }}
                 >
                   +
                 </button>
               </div>
             </div>
 
-            {/* Current Order Summary */}
-            {orderItems.length > 0 && (
-              <div style={styles.orderSummary}>
-                <h4 style={styles.summaryTitle}>Món đã chọn:</h4>
-                <div style={styles.summaryItems}>
-                  {orderItems.map((orderItem) => {
-                    const food = foodItems.find(f => f.id === orderItem.foodItemId);
-                    if (!food) return null;
-                    return (
-                      <div key={orderItem.foodItemId} style={styles.summaryItem}>
-                        <span style={styles.summaryItemName}>{food.name}</span>
-                        <span style={styles.summaryItemDetails}>
-                          {orderItem.quantity} × {formatVND(food.price)} = {formatVND(food.price * orderItem.quantity)}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+
 
             {/* Food Menu */}
             <div style={styles.menuSection}>
@@ -348,10 +387,43 @@ const OrderModal: React.FC<OrderModalProps> = ({ open, tableId, tableIds = [], o
         
         {/* Success Banner */}
         {success && (
-          <div style={styles.successBannerOverlay}>
-            <div style={styles.successBanner}>
-              
-              <div style={styles.successBannerText}>Tạo đơn thành công</div>
+          <div style={{
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            zIndex: 2000,
+          }}>
+            <div style={{
+              animation: 'slideInRight 0.3s ease-out, slideOutRight 0.3s ease-in 2.7s forwards',
+              background: '#f0f9f0',
+              border: '3px solid rgb(191, 235, 193)',
+              borderRadius: '8px',
+              padding: '12px 60px',
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#388e3c',
+              textAlign: 'center',
+              lineHeight: 1.1,
+              minHeight: '0',
+              minWidth: '170px',
+              width: 'auto',
+              maxWidth: 'none',
+              overflow: 'visible',
+              whiteSpace: 'nowrap',
+            }}>
+              <span style={{
+                fontSize: '13px',
+                fontWeight: 700,
+                color: '#388e3c',
+                lineHeight: 1.1,
+                display: 'block',
+                textAlign: 'center',
+                whiteSpace: 'nowrap',
+              }}>
+                Tạo đơn thành công
+              </span>
             </div>
           </div>
         )}
@@ -393,16 +465,17 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
   modal: {
     background: '#fff',
-    borderRadius: 16,
+    borderRadius: 20,
     width: '100%',
-    maxWidth: '600px',
-    maxHeight: '90vh',
-    boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+    maxWidth: '650px',
+    maxHeight: '92vh',
+    boxShadow: '0 12px 40px rgba(0,0,0,0.25)',
     position: 'relative',
     fontFamily: 'Segoe UI, Arial, sans-serif',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
+    border: '1px solid #f0f0f0',
   },
   mobileModal: {
     maxWidth: '100vw',
@@ -508,9 +581,10 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontFamily: 'Segoe UI, Arial, sans-serif',
   },
   header: {
-    padding: '8px 16px 8px 16px',
-    borderBottom: '1px solid #f0f0f0',
+    padding: '20px 24px 16px 24px',
+    borderBottom: '2px solid #f8f9fa',
     position: 'relative',
+    background: 'linear-gradient(135deg, #fff 0%, #f8f9fa 100%)',
   },
   closeBtn: {
     position: 'absolute',
@@ -528,16 +602,17 @@ const styles: { [key: string]: React.CSSProperties } = {
     justifyContent: 'center',
   },
   peopleSection: {
-    padding: '16px',
+    padding: '20px 24px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderBottom: '1px solid #f0f0f0',
+    background: '#fafbfc',
   },
   peopleLabel: {
     fontSize: '18px',
     fontWeight: 700,
-    color: '#111827',
+    color: '#263238',
   },
   peopleControls: {
     display: 'flex',
@@ -545,20 +620,20 @@ const styles: { [key: string]: React.CSSProperties } = {
     gap: '16px',
   },
   peopleBtn: {
-    width: '40px',
-    height: '40px',
+    width: '44px',
+    height: '44px',
     borderRadius: '50%',
-    border: '3px solid #ff9800',
+    border: '2px solid #ff9800',
     background: '#fff',
     color: '#ff9800',
-    fontSize: '20px',
+    fontSize: '22px',
     fontWeight: 'bold',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     transition: 'all 0.2s',
-    boxShadow: '0 2px 6px rgba(255, 152, 0, 0.2)'
+    boxShadow: '0 3px 10px rgba(255, 152, 0, 0.15)',
   },
   peopleNumber: {
     fontSize: '20px',
@@ -568,11 +643,12 @@ const styles: { [key: string]: React.CSSProperties } = {
     textAlign: 'center',
   },
   orderSummary: {
-    padding: '20px',
-    background: '#f8f9fa',
-    borderBottom: '1px solid #f0f0f0',
-    borderRadius: '8px',
-    margin: '0 16px',
+    padding: '24px',
+    background: 'linear-gradient(135deg, #f8f9fa 0%, #e3f2fd 100%)',
+    borderBottom: '1px solid #e0e0e0',
+    borderRadius: '12px',
+    margin: '0 24px 16px 24px',
+    border: '1px solid #e3f2fd',
   },
   summaryTitle: {
     fontSize: '18px',
@@ -590,10 +666,11 @@ const styles: { [key: string]: React.CSSProperties } = {
     justifyContent: 'space-between',
     alignItems: 'center',
     fontSize: '16px',
-    padding: '8px 12px',
+    padding: '12px 16px',
     background: '#fff',
-    borderRadius: '6px',
+    borderRadius: '8px',
     border: '1px solid #e0e0e0',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
   },
   summaryItemName: {
     fontWeight: 700,
@@ -612,20 +689,21 @@ const styles: { [key: string]: React.CSSProperties } = {
     flexDirection: 'column',
   },
   menuTitle: {
-    fontSize: '18px',
+    fontSize: '20px',
     fontWeight: 700,
-    color: '#111827',
+    color: '#263238',
     margin: '0',
-    padding: '16px 16px 8px 16px',
+    padding: '20px 24px 12px 24px',
   },
   menuContainer: {
     flex: 1,
     overflowY: 'auto',
-    padding: '8px 16px',
-    maxHeight: '440px', // Exact height for 4 items (110px per item)
+    padding: '12px 24px',
+    maxHeight: '460px',
     border: '1px solid #e0e0e0',
-    borderRadius: 8,
+    borderRadius: 12,
     position: 'relative',
+    background: '#fafbfc',
   },
   menuItem: {
     display: 'flex',
@@ -633,17 +711,20 @@ const styles: { [key: string]: React.CSSProperties } = {
     padding: '20px',
     marginBottom: '16px',
     background: '#fff',
-    borderRadius: '12px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+    borderRadius: '16px',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
     gap: '16px',
     minHeight: '100px',
+    border: '1px solid #f0f0f0',
+    transition: 'all 0.2s ease',
   },
   foodImage: {
     width: '80px',
     height: '80px',
     objectFit: 'cover',
-    borderRadius: '10px',
+    borderRadius: '12px',
     flexShrink: 0,
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
   },
   foodInfo: {
     flex: 1,
@@ -709,17 +790,19 @@ const styles: { [key: string]: React.CSSProperties } = {
     textAlign: 'center',
   },
   footer: {
-    padding: '16px',
-    borderTop: '1px solid #f0f0f0',
+    padding: '20px 24px',
+    borderTop: '2px solid #f8f9fa',
+    background: 'linear-gradient(135deg, #f8f9fa 0%, #fff 100%)',
   },
   totalSection: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '16px',
-    padding: '12px',
-    background: '#f8f9fa',
-    borderRadius: '8px',
+    marginBottom: '20px',
+    padding: '16px 20px',
+    background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)',
+    borderRadius: '12px',
+    border: '2px solid #ff9800',
   },
   totalLabel: {
     fontSize: '18px',
@@ -732,27 +815,36 @@ const styles: { [key: string]: React.CSSProperties } = {
     color: '#ff9800',
   },
   submitBtn: {
-    width: 'auto',
-    padding: '10px 28px',
-    fontSize: '16px',
-    fontWeight: 600,
-    borderRadius: '8px',
+    width: '100%',
+    padding: '16px 32px',
+    fontSize: '18px',
+    fontWeight: 700,
+    borderRadius: '12px',
     border: 'none',
-    background: '#ff9800',
+    background: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)',
     color: '#fff',
     cursor: 'pointer',
-    transition: 'all 0.2s',
+    transition: 'all 0.3s',
     letterSpacing: '1px',
-    boxShadow: '0 2px 8px rgba(255, 152, 0, 0.08)',
+    boxShadow: '0 4px 16px rgba(255, 152, 0, 0.3)',
     display: 'block',
     margin: '0 auto',
+    textTransform: 'uppercase',
   },
   successBannerOverlay: {
     position: 'fixed',
-    top: '20px',
-    left: '50%',
-    transform: 'translateX(-50%)',
-    zIndex: 2000,
+    top: 0,
+    left: 0,
+    width: '100vw',
+    height: '100vh',
+    background: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+    fontFamily: 'Segoe UI, Arial, sans-serif',
+    padding: '20px',
+    boxSizing: 'border-box',
   },
   successBanner: {
     background: '#f0f9f0',

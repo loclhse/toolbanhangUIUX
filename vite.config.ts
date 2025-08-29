@@ -5,25 +5,12 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5173,
-    host: 'localhost',
-    strictPort: true,
-    headers: {
-      'Cross-Origin-Embedder-Policy': 'unsafe-none',
-      'Cross-Origin-Opener-Policy': 'unsafe-none'
-    }
+    port: 3000,
+    host: true, // Allow external access
+    open: true, // Auto-open browser
+    strictPort: false, // Allow fallback to other ports
   },
   optimizeDeps: {
     include: ['react', 'react-dom']
-  },
-  build: {
-    sourcemap: true,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom']
-        }
-      }
-    }
   }
 })

@@ -35,24 +35,158 @@ function TablesPage() {
   const isMobile = window.innerWidth <= 768;
 
   useEffect(() => {
+    console.log('🚀 TablesPage: Fetching tables from API');
+    
     fetch(`${API_BASE_URL}/api/tables`)
       .then((res) => {
-        if (!res.ok) throw new Error('Network response was not ok');
+        if (!res.ok) throw new Error(`Network response was not ok: ${res.status}`);
         return res.json();
       })
       .then((data: TableApiResponse) => {
+        console.log('📊 TablesPage: Received', data.data.length, 'tables');
         setTables(data.data);
         setLoading(false);
       })
       .catch((err) => {
+        console.error('❌ TablesPage: Fetch error:', err);
         setError(err.message);
         setLoading(false);
       });
   }, []);
 
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error}</div>;
-  if (!tables.length) return <div>No table data</div>;
+  if (loading) return (
+    <div
+      style={{
+        width: '100%',
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'flex-start',
+        alignItems: 'center',
+        padding: isMobile ? '0.5rem 0' : '1rem 0',
+        position: 'relative',
+        maxWidth: '100vw',
+        boxSizing: 'border-box',
+        margin: 0,
+      }}
+    >
+      {/* Header skeleton */}
+      <div style={{ 
+        width: '100%', 
+        display: 'flex', 
+        justifyContent: 'center', 
+        padding: isMobile ? '0 8px 8px 8px' : '0 16px 12px 16px', 
+        marginBottom: isMobile ? 0 : 32,
+        marginRight: 0,
+        boxSizing: 'border-box'
+      }}>
+        <div style={{
+          width: '100%',
+          maxWidth: '100%',
+          display: 'flex',
+          justifyContent: 'flex-start',
+          alignItems: 'center',
+          position: 'relative',
+          marginLeft: isMobile ? 35 : 16,
+          gap: isMobile ? '0.75rem' : '2rem'
+        }}>
+          <div style={{
+            background: '#e0e0e0',
+            borderRadius: 8,
+            padding: isMobile ? '8px 20px' : '10px 28px',
+            width: isMobile ? '80px' : '100px',
+            height: isMobile ? '36px' : '40px',
+            animation: 'pulse 1.5s ease-in-out infinite'
+          }} />
+        </div>
+      </div>
+      
+      {/* Tables container skeleton */}
+      <div style={{ 
+        position: 'relative', 
+        width: '100%', 
+        display: 'flex', 
+        flexDirection: 'column', 
+        alignItems: 'center',
+        padding: isMobile ? '0 8px' : '0 16px',
+        boxSizing: 'border-box'
+      }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, 1fr)',
+            gap: isMobile ? '0.75rem' : '2rem',
+            width: '100%',
+            maxWidth: '100%',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          {/* Table skeleton cards */}
+          {[...Array(6)].map((_, i) => (
+            <div key={i} style={{
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              position: 'relative',
+              background: '#fff',
+              borderRadius: '12px',
+              boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
+              padding: '20px',
+              minHeight: '120px',
+              animation: 'pulse 1.5s ease-in-out infinite'
+            }}>
+              {/* Table number skeleton */}
+              <div style={{
+                background: '#e0e0e0',
+                borderRadius: '50%',
+                width: '60px',
+                height: '60px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: '12px'
+              }} />
+              
+              {/* Table status skeleton */}
+              <div style={{
+                background: '#e0e0e0',
+                borderRadius: '4px',
+                width: '80px',
+                height: '16px',
+                marginBottom: '8px'
+              }} />
+              
+              {/* Table info skeleton */}
+              <div style={{
+                background: '#e0e0e0',
+                borderRadius: '4px',
+                width: '60px',
+                height: '12px'
+              }} />
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      <style>{`
+        @keyframes pulse {
+          0% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.5;
+          }
+          100% {
+            opacity: 1;
+          }
+        }
+      `}</style>
+    </div>
+  );
+  if (error) return <div style={{padding: '20px', fontSize: '18px', color: 'red'}}>Error: {error}</div>;
+  if (!tables.length) return <div style={{padding: '20px', fontSize: '18px'}}>No table data available</div>;
 
   const handleTableClick = (tableId: string) => {
     setSelectedTableIds((prev) =>

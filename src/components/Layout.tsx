@@ -1,12 +1,9 @@
 import React from 'react';
+import { Outlet } from 'react-router-dom';
 
-interface LayoutProps {
-  children: React.ReactNode;
-}
-
-function Layout({ children }: LayoutProps) {
+function Layout() {
+  console.log('🏗️ Layout component rendering');
   const isMobile = window.innerWidth <= 768;
-  
   return (
     <div style={{ 
       padding: isMobile ? '12px 8px' : '24px',
@@ -16,7 +13,8 @@ function Layout({ children }: LayoutProps) {
       margin: 0
     }}>
       {/* Add header/footer here if needed */}
-      {children}
+      
+      <Outlet />
     </div>
   );
 }

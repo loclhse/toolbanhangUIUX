@@ -8,6 +8,7 @@ interface WebSocketContextType {
   disconnect: () => void;
   on: (event: string, callback: (data: any) => void) => void;
   off: (event: string) => void;
+  send: (destination: string, message: any) => void;
 }
 
 const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined);
@@ -31,8 +32,14 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
   useEffect(() => {
     console.log('🔌 Khởi tạo WebSocket provider...');
     
-    // Kết nối WebSocket
-    webSocketService.connect();
+    // Wrap WebSocket connection in try-catch to prevent app crashes
+    try {
+      // Kết nối WebSocket
+      webSocketService.connect();
+    } catch (error) {
+      console.error('❌ Failed to initialize WebSocket:', error);
+      // Continue rendering the app even if WebSocket fails
+    }
 
     // Lắng nghe sự kiện kết nối
     const handleConnect = () => {
@@ -60,9 +67,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
 
     // Cleanup
     return () => {
-      webSocketService.off('connect');
-      webSocketService.off('disconnect');
-      webSocketService.off('connect_error');
+      try {
+        webSocketService.off('connect');
+        webSocketService.off('disconnect');
+        webSocketService.off('connect_error');
+      } catch (error) {
+        console.error('❌ Error during WebSocket cleanup:', error);
+      }
     };
   }, []);
 
@@ -88,6 +99,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     disconnect,
     on,
     off,
+    send: (destination, message) => webSocketService.send(destination, message),
   };
 
   return (

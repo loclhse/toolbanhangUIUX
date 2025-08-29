@@ -2,6 +2,9 @@ import SockJS from 'sockjs-client';
 import { Stomp } from '@stomp/stompjs';
 import { WS_BASE_URL } from '../config';
 
+// Check if we're in development mode
+const isDevelopment = import.meta.env.DEV || window.location.hostname === 'localhost';
+
 class WebSocketService {
       private stompClient: any = null;
     private isConnected = false;
@@ -9,6 +12,21 @@ class WebSocketService {
     private reconnectAttempts = 0;
     private reconnectTimer: any = null;
   private eventListeners: Map<string, ((data: any) => void)[]> = new Map();
+  private pingTimer: any = null;
+
+  constructor() {
+    // Khi mạng trở lại → thử reconnect ngay (không đợi backoff)
+    window.addEventListener('online', () => {
+      console.log('🌐 Online - trying to reconnect WS if needed');
+      if (!this.isConnected && !this.isConnecting) {
+        this.connect();
+      }
+    });
+
+    window.addEventListener('offline', () => {
+      console.log('🌐 Offline - WS will reconnect when online');
+    });
+  }
 
   // Kết nối WebSocket (được guard để tránh connect trùng)
   connect() {
@@ -17,6 +35,9 @@ class WebSocketService {
         console.log('🔁 Bỏ qua connect: client đã', this.isConnected ? 'CONNECTED' : 'CONNECTING');
         return;
       }
+
+      // Force real WebSocket connection for testing
+      console.log('🔌 Force connecting to real WebSocket server...');
 
       console.log('🔌 Đang kết nối WebSocket...');
       this.isConnecting = true;
@@ -29,12 +50,20 @@ class WebSocketService {
       console.log('🔌 Client origin: localhost:5173 → Server: 103.90.227.18/ws');
       
       // Tạo STOMP client với SockJS
-      this.stompClient = Stomp.over(() => new SockJS(wsUrl));
+      try {
+        this.stompClient = Stomp.over(() => new SockJS(wsUrl));
+      } catch (sockjsError) {
+        console.error('❌ Failed to create SockJS connection:', sockjsError);
+        this.isConnecting = false;
+        this.emitEvent('connect_error', { error: 'Failed to create SockJS connection' });
+        return;
+      }
       
-      // Enable debug temporarily to see what's happening
-      this.stompClient.debug = (str: string) => {
+      // Enable debug only in development
+      const isDevelopment = import.meta.env.DEV || window.location.hostname === 'localhost';
+      this.stompClient.debug = isDevelopment ? (str: string) => {
         console.log('🔍 STOMP Debug:', str);
-      };
+      } : undefined;
 
       // Cấu hình heartbeat và auto-reconnect cơ bản (CompatClient API)
       this.stompClient.reconnectDelay = 5000;
@@ -60,6 +89,9 @@ class WebSocketService {
             setTimeout(() => {
               this.subscribeToTopics();
             }, 100);
+            
+            // Start ping timer to keep connection alive
+            this.startPing();
           },
           (error: any) => {
             console.error('❌ Lỗi kết nối WebSocket:', error);
@@ -85,6 +117,7 @@ class WebSocketService {
         console.warn('⚠️ WebSocket closed');
         this.isConnected = false;
         this.isConnecting = false;
+        this.stopPing();
         this.scheduleReconnect();
       };
 
@@ -105,7 +138,8 @@ class WebSocketService {
   private subscribeToTopics() {
     console.log('📡 Đang subscribe vào các topic...');
     console.log('📡 Connection status before subscription:', this.isConnected);
-    console.log('📡 Client: localhost:5173 → Broker: 103.90.227.18/ws');
+    console.log('📡 STOMP client connected:', this.stompClient?.connected);
+    
     
     // Subscribe vào topic orders
     this.subscribe('/topic/orders', 'orders', (message) => {
@@ -127,9 +161,11 @@ class WebSocketService {
       // Xóa dấu ngoặc kép nếu có
       if (orderId.startsWith('"') && orderId.endsWith('"')) {
         orderId = orderId.slice(1, -1);
+        console.log('📨 Removed quotes from orderId:', orderId);
       }
       
       console.log('🗑️ Order bị xóa:', orderId);
+      console.log('🗑️ Emitting order_deleted event with orderId:', orderId);
       this.emitEvent('order_deleted', orderId);
     });
 
@@ -144,11 +180,37 @@ class WebSocketService {
         console.error('❌ Lỗi parse payment message:', error);
       }
     });
+
+    // Subscribe vào topic order-item-marks
+    this.subscribe('/topic/order-item-marks', 'order-item-marks', (message) => {
+      console.log('📨 Nhận message từ /topic/order-item-marks:', message.body);
+      try {
+        const evt = JSON.parse(message.body);
+        // { orderId, itemId, marked }
+        console.log('✅ Dữ liệu item mark:', evt);
+        this.emitEvent('order_item_marked', evt);
+      } catch (error) {
+        console.error('❌ Lỗi parse order-item-marks message:', error);
+      }
+    });
+
+    // Subscribe vào topic pong (echo từ ping)
+    this.subscribe('/topic/pong', 'pong', (message) => {
+      try {
+        const pong = JSON.parse(message.body);
+        console.log('🏓 Received pong:', pong.ts, 'latency:', Date.now() - pong.ts, 'ms');
+      } catch (error) {
+        console.error('❌ Lỗi parse pong message:', error);
+      }
+    });
   }
 
   // Subscribe vào một topic cụ thể
   private subscribe(destination: string, id: string, callback: (message: any) => void) {
-    console.log(`🔍 Attempting to subscribe to ${destination}, connected: ${this.isConnected}`);
+    console.log(`🔍 Attempting to subscribe to ${destination}`);
+    console.log(`🔍 isConnected: ${this.isConnected}`);
+    console.log(`🔍 stompClient.connected: ${this.stompClient?.connected}`);
+    console.log(`🔍 stompClient exists: ${!!this.stompClient}`);
     
     if (!this.stompClient) {
       console.error(`❌ STOMP client not initialized for ${destination}`);
@@ -160,9 +222,16 @@ class WebSocketService {
       return;
     }
     
+    if (!this.stompClient.connected) {
+      console.warn(`⚠️ STOMP client not connected, cannot subscribe to ${destination}`);
+      return;
+    }
+    
     try {
+      console.log(`🔍 Subscribing to ${destination}...`);
       const subscription = this.stompClient.subscribe(destination, callback);
       console.log(`✅ Đã subscribe vào ${destination} với id: ${id}`);
+      console.log(`✅ Subscription object:`, subscription);
       return subscription;
     } catch (error) {
       console.error(`❌ Không thể subscribe vào ${destination}:`, error);
@@ -184,10 +253,35 @@ class WebSocketService {
       } catch {}
       this.isConnected = false;
       this.isConnecting = false;
+      this.stopPing();
       if (this.reconnectTimer) {
         clearTimeout(this.reconnectTimer);
         this.reconnectTimer = null;
       }
+    }
+  }
+
+  // Start ping timer to keep connection alive
+  private startPing() {
+    if (this.pingTimer) return;
+    this.pingTimer = setInterval(() => {
+      if (this.isConnected) {
+        try {
+          this.send('/app/ping', { ts: Date.now() });
+        } catch (error) {
+          console.warn('⚠️ Failed to send ping:', error);
+        }
+      }
+    }, 25000); // Send ping every 25 seconds
+    console.log('🏓 Started ping timer');
+  }
+
+  // Stop ping timer
+  private stopPing() {
+    if (this.pingTimer) {
+      clearInterval(this.pingTimer);
+      this.pingTimer = null;
+      console.log('🏓 Stopped ping timer');
     }
   }
 
@@ -253,7 +347,7 @@ class WebSocketService {
        clearTimeout(this.reconnectTimer);
      }
      
-     const delay = Math.min(5000 * Math.pow(2, this.reconnectAttempts), 30000); // max 30s
+     const delay = Math.min(5000 * Math.pow(2, this.reconnectAttempts), 20000); // max 20s thay vì 30s
      this.reconnectAttempts++;
      
      console.log(`🔄 Lên lịch reconnect sau ${delay}ms (attempt ${this.reconnectAttempts})`);

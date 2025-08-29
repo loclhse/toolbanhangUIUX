@@ -56,11 +56,39 @@ const getStatusLabel = (status: string) => {
   return status;
 };
 
+// Add keyframes for toast/snackbar animation
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  const style = document.createElement('style');
+  style.innerHTML = `
+    @keyframes slideInRight {
+      from {
+        transform: translateX(120%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    @keyframes slideOutRight {
+      from {
+        transform: translateX(0);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(120%);
+        opacity: 0;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 const OrdersPage: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-    const { isConnected, on, off, connect } = useWebSocket();
+    const { isConnected, on, off, connect, send } = useWebSocket();
   const [adjustOrderId, setAdjustOrderId] = useState<string | null>(null);
   const [adjustOrderLoading, setAdjustOrderLoading] = useState(false);
   const [adjustOrderDetails, setAdjustOrderDetails] = useState<Order | null>(null);
@@ -132,8 +160,72 @@ const OrdersPage: React.FC = () => {
     // Keep track of deleted order IDs in component state
     const [deletedOrderIds, setDeletedOrderIds] = useState<string[]>([]);
 
+    // Listen for realtime item mark events
+    useEffect(() => {
+      const handleMarkEvt = (evt: { orderId: string; itemId: string; marked: boolean }) => {
+        console.log('📋 Received realtime item mark event:', evt);
+        setMarkedItems(prev => {
+          const next = new Map(prev);
+          const setForOrder = new Set(next.get(evt.orderId) || []);
+          if (evt.marked) {
+            setForOrder.add(evt.itemId);
+          } else {
+            setForOrder.delete(evt.itemId);
+          }
+          next.set(evt.orderId, setForOrder);
+          
+          // Persist to localStorage
+          try {
+            const serialized = Object.fromEntries(
+              Array.from(next.entries()).map(([oid, itemSet]) => [oid, Array.from(itemSet)])
+            );
+            localStorage.setItem('markedItems', JSON.stringify(serialized));
+          } catch (error) {
+            console.error('Error saving marked items to localStorage:', error);
+          }
+          
+          return next;
+        });
+      };
+
+      on('order_item_marked', handleMarkEvt);
+      return () => {
+        off('order_item_marked');
+      };
+    }, [on, off]);
+
+    // Filter out deleted orders from API response
+    const filterDeletedOrders = useCallback((orders: Order[]) => {
+      const missedDeletions = localStorage.getItem('missedOrderDeletions');
+      
+      // Combine localStorage and component state deleted order IDs
+      let allDeletedOrderIds = [...deletedOrderIds];
+      
+      if (missedDeletions) {
+        try {
+          const localStorageDeletedIds = JSON.parse(missedDeletions);
+          allDeletedOrderIds = [...allDeletedOrderIds, ...localStorageDeletedIds];
+          
+          // Clear the missed deletions from localStorage
+          localStorage.removeItem('missedOrderDeletions');
+          console.log('🗑️ Cleared missedOrderDeletions from localStorage');
+          
+          // Update component state with the new deleted order IDs
+          setDeletedOrderIds(allDeletedOrderIds);
+        } catch (error) {
+          console.error('❌ Error parsing missed order deletions:', error);
+          localStorage.removeItem('missedOrderDeletions');
+        }
+      }
+      
+      if (allDeletedOrderIds.length > 0) {
+        return orders.filter(order => !allDeletedOrderIds.includes(order.id));
+      }
+      
+      return orders;
+    }, [deletedOrderIds]);
+
     const fetchOrders = useCallback(async (showLoading = true) => {
-      console.log('🎯 fetchOrders called, showLoading:', showLoading);
       if (showLoading) {
         setLoading(true);
       }
@@ -148,7 +240,6 @@ const OrdersPage: React.FC = () => {
         
         if (!res.ok) throw new Error('Failed to fetch orders');
         const data = await res.json();
-        console.log('📋 Fetched orders:', data.data.length);
         
         // Filter out any orders that were deleted while the page was inactive
         const filteredOrders = filterDeletedOrders(data.data || []);
@@ -196,7 +287,7 @@ const OrdersPage: React.FC = () => {
           setLoading(false);
         }
       }
-    }, []);
+    }, [filterDeletedOrders, deletedOrderIds]);
 
     // Fetch orders on component mount and when user navigates back
     useEffect(() => {
@@ -270,36 +361,7 @@ const OrdersPage: React.FC = () => {
 
 
 
-        // Filter out deleted orders from API response
-    const filterDeletedOrders = useCallback((orders: Order[]) => {
-      const missedDeletions = localStorage.getItem('missedOrderDeletions');
-      
-      // Combine localStorage and component state deleted order IDs
-      let allDeletedOrderIds = [...deletedOrderIds];
-      
-      if (missedDeletions) {
-        try {
-          const localStorageDeletedIds = JSON.parse(missedDeletions);
-          allDeletedOrderIds = [...allDeletedOrderIds, ...localStorageDeletedIds];
-          
-          // Clear the missed deletions from localStorage
-          localStorage.removeItem('missedOrderDeletions');
-          console.log('🗑️ Cleared missedOrderDeletions from localStorage');
-          
-          // Update component state with the new deleted order IDs
-          setDeletedOrderIds(allDeletedOrderIds);
-        } catch (error) {
-          console.error('❌ Error parsing missed order deletions:', error);
-          localStorage.removeItem('missedOrderDeletions');
-        }
-      }
-      
-      if (allDeletedOrderIds.length > 0) {
-        return orders.filter(order => !allDeletedOrderIds.includes(order.id));
-      }
-      
-      return orders;
-    }, [deletedOrderIds]);
+
 
     // Store the last deleted order ID to handle missed WebSocket messages
     const [lastDeletedOrderId, setLastDeletedOrderId] = useState<string | null>(null);
@@ -316,12 +378,29 @@ const OrdersPage: React.FC = () => {
         console.log('🔌 Attempting to connect WebSocket...');
         connect();
       }
-      const handleOrderUpdate = (updatedOrder: Order) => {
-        console.log('📋 Received order update via WebSocket:', updatedOrder);
-        
-
-        
-        // Update the orders list
+              const handleOrderUpdate = (updatedOrder: Order) => {
+          console.log('📋 Received order update via WebSocket:', updatedOrder);
+          
+          // Check if order status changed to DONE and clear marked items
+          const existingOrder = orders.find(o => o.id === updatedOrder.id);
+          if (existingOrder && existingOrder.status !== 'DONE' && updatedOrder.status === 'DONE') {
+            console.log('📋 Order marked as DONE, clearing marked items');
+            setMarkedItems(prev => {
+              const next = new Map(prev);
+              next.delete(updatedOrder.id);
+              try {
+                const serialized = Object.fromEntries(
+                  Array.from(next.entries()).map(([oid, itemSet]) => [oid, Array.from(itemSet)])
+                );
+                localStorage.setItem('markedItems', JSON.stringify(serialized));
+              } catch (error) {
+                console.error('Error saving marked items to localStorage:', error);
+              }
+              return next;
+            });
+          }
+          
+          // Update the orders list
         setOrders(prevOrders => {
           const index = prevOrders.findIndex(o => o.id === updatedOrder.id);
           if (index !== -1) {
@@ -414,35 +493,17 @@ const OrdersPage: React.FC = () => {
         // Remove order from UI immediately
         setOrders(prevOrders => {
           const filtered = prevOrders.filter(order => order.id !== orderId);
-          console.log('🗑️ Orders before deletion:', prevOrders.length, 'after:', filtered.length);
+          console.log('🗑️ Order removed from UI:', orderId);
           return filtered;
         });
         
         // Store deleted order ID to prevent it from being re-added by fetchOrders
-        setDeletedOrderIds(prev => {
-          const updated = [...prev, orderId];
-          console.log('🗑️ Updated deleted order IDs:', updated);
-          return updated;
-        });
+        setDeletedOrderIds(prev => [...prev, orderId]);
         
         // Clean up marked items for deleted order
         setMarkedItems(prev => {
           const newMap = new Map(prev);
           newMap.delete(orderId);
-          
-          // Save updated state to localStorage
-          try {
-            const serialized = Object.fromEntries(
-              Array.from(newMap.entries()).map(([orderId, itemSet]) => [
-                orderId, 
-                Array.from(itemSet)
-              ])
-            );
-            localStorage.setItem('markedItems', JSON.stringify(serialized));
-          } catch (error) {
-            console.error('Error saving marked items to localStorage:', error);
-          }
-          
           return newMap;
         });
       };
@@ -516,6 +577,10 @@ const OrdersPage: React.FC = () => {
       on('order_update', handleOrderUpdate);
       on('order_deleted', handleOrderDeleted);
       on('payment_update', handlePaymentUpdate);
+      
+
+      
+
       
       // Add a test message handler to verify WebSocket is working
       on('test_message', (data) => {
@@ -794,6 +859,39 @@ const OrdersPage: React.FC = () => {
       console.log('✅ Adjustment successful:', responseData);
       
       setSubmitSuccess(true);
+      
+      // Update the order details with the new data from response
+      if (responseData.data) {
+        setAdjustOrderDetails(responseData.data);
+        
+                 // Update form data with the new order data
+         if (foodItems.length > 0) {
+           const mappedItems = responseData.data.items.map((orderItem: any) => {
+             const matchingFoodItem = foodItems.find(foodItem => 
+               foodItem.name === orderItem.foodItemName && foodItem.price === orderItem.price
+             );
+             
+             if (matchingFoodItem) {
+               return {
+                 foodItemId: matchingFoodItem.id,
+                 quantity: orderItem.quantity
+               };
+             } else {
+               console.warn(`Could not match order item "${orderItem.foodItemName}" with price ${orderItem.price} after update`);
+               return null;
+             }
+           }).filter(Boolean);
+           
+           setAdjustFormData({
+             tableIds: responseData.data.tableNumbers.map((num: any) => {
+               const table = tables?.find(t => t.number === num);
+               return table?.id || '';
+             }).filter((id: any) => id),
+             numberOfPeople: responseData.data.numberOfPeople,
+             items: mappedItems as { foodItemId: string; quantity: number }[]
+           });
+         }
+      }
         
       setTimeout(() => {
         handleCloseAdjust();
@@ -835,14 +933,17 @@ const OrdersPage: React.FC = () => {
   };
 
     const handleToggleMark = (orderId: string, itemId: string) => {
-    setMarkedItems(prev => {
-      const newMap = new Map(prev);
+      const currentlyMarked = !!(markedItems.get(orderId)?.has(itemId));
+      const willMark = !currentlyMarked;
+
+      setMarkedItems(prev => {
+        const newMap = new Map(prev);
         const orderMarkedItems = new Set(newMap.get(orderId) || []);
-      
-        if (orderMarkedItems.has(itemId)) {
-          orderMarkedItems.delete(itemId);
-      } else {
+        
+        if (willMark) {
           orderMarkedItems.add(itemId);
+        } else {
+          orderMarkedItems.delete(itemId);
         }
         
         if (orderMarkedItems.size === 0) {
@@ -854,8 +955,8 @@ const OrdersPage: React.FC = () => {
         // Save to localStorage
         try {
           const serialized = Object.fromEntries(
-            Array.from(newMap.entries()).map(([orderId, itemSet]) => [
-              orderId, 
+            Array.from(newMap.entries()).map(([oid, itemSet]) => [
+              oid, 
               Array.from(itemSet)
             ])
           );
@@ -864,9 +965,17 @@ const OrdersPage: React.FC = () => {
           console.error('Error saving marked items to localStorage:', error);
         }
         
-      return newMap;
-    });
-  };
+        return newMap;
+      });
+
+      // Send realtime event to backend
+      try {
+        console.log('📤 Sending item mark event:', { orderId, itemId, marked: willMark });
+        send('/app/order-item-marks', { orderId, itemId, marked: willMark });
+      } catch (error) {
+        console.warn('⚠️ Failed to send item mark event, keeping optimistic state:', error);
+      }
+    };
 
         
 
@@ -928,22 +1037,220 @@ const OrdersPage: React.FC = () => {
     };
 
     if (loading) return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: '#f5f5f5',
-      fontFamily: 'Segoe UI, Arial, sans-serif'
+    <div style={{ 
+      maxWidth: window.innerWidth <= 768 ? '100%' : 900, 
+      margin: window.innerWidth <= 768 ? '16px auto' : '32px auto', 
+      padding: window.innerWidth <= 768 ? '12px' : '24px',
+      width: '100%',
+      boxSizing: 'border-box'
     }}>
-      <div style={{
-        textAlign: 'center',
-        color: '#1976d2',
-        fontSize: '18px',
-        fontWeight: 500
+      {/* Header skeleton */}
+      <div style={{ 
+        width: '100%', 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        marginBottom: 24 
       }}>
-        Đang tải đơn hàng...
+        <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
+          <div style={{
+            background: '#e0e0e0',
+            borderRadius: 8,
+            padding: '8px 20px',
+            width: '120px',
+            height: '36px',
+            animation: 'pulse 1.5s ease-in-out infinite'
+          }} />
+          <div style={{
+            background: '#e0e0e0',
+            borderRadius: 8,
+            padding: '8px 20px',
+            width: '120px',
+            height: '36px',
+            animation: 'pulse 1.5s ease-in-out infinite'
+          }} />
+        </div>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          fontSize: '12px',
+          color: '#666'
+        }}>
+          <div style={{
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            background: '#e0e0e0',
+            animation: 'pulse 1.5s ease-in-out infinite'
+          }} />
+          <div style={{
+            background: '#e0e0e0',
+            borderRadius: 4,
+            width: '60px',
+            height: '12px',
+            animation: 'pulse 1.5s ease-in-out infinite'
+          }} />
+        </div>
       </div>
+      
+      {/* Order cards skeleton */}
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        gap: 24,
+        position: 'relative'
+      }}>
+        {[1, 2, 3].map((index) => (
+          <div key={index} style={{
+            background: '#fff',
+            borderRadius: 12,
+            boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
+            padding: 20,
+            animation: 'pulse 1.5s ease-in-out infinite'
+          }}>
+            {/* Order ID skeleton */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              marginBottom: 8 
+            }}>
+              <div style={{
+                background: '#e0e0e0',
+                borderRadius: 4,
+                width: '200px',
+                height: '20px',
+                marginBottom: 8
+              }} />
+            </div>
+            
+            {/* Table info skeleton */}
+            <div style={{ 
+              marginBottom: 8, 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center', 
+              gap: 18 
+            }}>
+              <div style={{
+                background: '#e0e0e0',
+                borderRadius: 4,
+                width: '150px',
+                height: '18px'
+              }} />
+              <div style={{
+                background: '#e0e0e0',
+                borderRadius: 4,
+                width: '150px',
+                height: '18px'
+              }} />
+              <div style={{
+                background: '#e0e0e0',
+                borderRadius: 4,
+                width: '150px',
+                height: '18px'
+              }} />
+            </div>
+            
+            {/* Table skeleton */}
+            <div style={{
+              fontFamily: "'Roboto', 'Segoe UI', Arial, sans-serif",
+              fontSize: 15,
+              color: '#222',
+              background: '#fff',
+              borderRadius: 12,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+              padding: 16,
+              margin: 8,
+              border: '1px solid #eee',
+              maxWidth: 400,
+            }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', margin: '12px 0' }}>
+                <thead>
+                  <tr>
+                    <th style={{ 
+                      background: '#e0e0e0', 
+                      padding: '8px 12px', 
+                      borderRadius: 4,
+                      height: '20px'
+                    }} />
+                    <th style={{ 
+                      background: '#e0e0e0', 
+                      padding: '8px 12px', 
+                      borderRadius: 4,
+                      height: '20px'
+                    }} />
+                    <th style={{ 
+                      background: '#e0e0e0', 
+                      padding: '8px 12px', 
+                      borderRadius: 4,
+                      height: '20px'
+                    }} />
+                    <th style={{ 
+                      background: '#e0e0e0', 
+                      padding: '8px 12px', 
+                      borderRadius: 4,
+                      height: '20px'
+                    }} />
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style={{ 
+                      background: '#e0e0e0', 
+                      padding: '8px 12px', 
+                      borderRadius: 4,
+                      height: '20px'
+                    }} />
+                    <td style={{ 
+                      background: '#e0e0e0', 
+                      padding: '8px 12px', 
+                      borderRadius: 4,
+                      height: '20px'
+                    }} />
+                    <td style={{ 
+                      background: '#e0e0e0', 
+                      padding: '8px 12px', 
+                      borderRadius: 4,
+                      height: '20px'
+                    }} />
+                    <td style={{ 
+                      background: '#e0e0e0', 
+                      padding: '8px 12px', 
+                      borderRadius: 4,
+                      height: '20px'
+                    }} />
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Total skeleton */}
+            <div style={{
+              marginTop: 16, 
+              textAlign: 'center', 
+              padding: '12px', 
+              background: '#e0e0e0', 
+              borderRadius: 8, 
+              height: '20px'
+            }} />
+          </div>
+        ))}
+      </div>
+      
+      <style>{`
+        @keyframes pulse {
+          0% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.5;
+          }
+          100% {
+            opacity: 1;
+          }
+        }
+      `}</style>
     </div>
   );
   
@@ -978,67 +1285,90 @@ const OrdersPage: React.FC = () => {
       boxSizing: 'border-box'
     }}>
         {/* Banner Notification - Warning */}
-        {notification && notification.type === 'warning' && (
-        <div
-        style={{
-          position: 'fixed',
-          top: '20px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 2000,
-          animation: 'slideIn 0.3s ease-out',
-          background: '#ffebee',
-          border: '2px solid #ef9a9a',
-          borderRadius: '14px',
-          padding: isMobile ? '20px 28px' : '26px 40px',
-          boxShadow: '0 10px 28px rgba(0, 0, 0, 0.2)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: isMobile ? '49px' : '50px',
-          fontWeight: 900,
-          color: '#000000',
-          textAlign: 'center',
-          lineHeight: 1.25,
-          width: isMobile ? '80vw' : 'auto',
-          maxWidth: isMobile ? '70vw' : '380px',
-          minWidth: isMobile ? 'auto' : '280px',
-          minHeight: isMobile ? '60px' : '85px',
-        }}
-      >
-        Đơn Hàng Chưa Hoàn Thành
-      </div>
-      )}
+       {/* Toast Notification - Warning */}
+{/* Toast Notification - Warning */}
+{notification && notification.type === 'warning' && (
+  <div
+    style={{
+      position: 'fixed',
+      top: '20px',
+      right: '20px',
+      zIndex: 2000,
+      animation: 'slideInRight 0.3s ease-out, slideOutRight 0.3s ease-in 2.7s forwards',
+      background: '#ffebee',
+      border: '3px solidrgba(229, 56, 53, 0.81)',
+      borderRadius: '5px',
+      padding: '40px 60px',
+      boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+     
+      color: '#d32f2f',
+      textAlign: 'center',
+      lineHeight: 1.1,
+      minHeight: '45px',
+      minWidth: '300px',
+      width: 'auto',
+      maxWidth: 'none',
+      overflow: 'visible',
+      whiteSpace: 'nowrap',
+    }}
+  >
+    <span style={{
+      fontSize: '13px',
+      fontWeight: 700,
+      color: '#d32f2f',
+      lineHeight: 1.1,
+      display: 'block',
+      textAlign: 'center',
+      whiteSpace: 'nowrap',
+    }}>
+      Đơn Hàng Chưa Hoàn Thành
+    </span>
+  </div>
+)}
+
+      
                 {/* Banner Notification - Success */}
         {notification && notification.type === 'success' && (
         <div
         style={{
           position: 'fixed',
           top: '20px',
-          left: '50%',
-          transform: 'translateX(-50%)',
+          right: '20px',
           zIndex: 2000,
-          animation: 'slideIn 0.3s ease-out',
+          animation: 'slideInRight 0.3s ease-out, slideOutRight 0.3s ease-in 2.7s forwards',
           background: '#f0f9f0',
-          border: '2px solid #4caf50',
-          borderRadius: '14px',
-          padding: isMobile ? '20px 28px' : '26px 40px',
-          boxShadow: '0 10px 28px rgba(0, 0, 0, 0.2)',
+          border: '3px solidrgba(88, 204, 94, 0.96)',
+          borderRadius: '5px',
+          padding: '40px 60px',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.15)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: isMobile ? '49px' : '50px',
-          fontWeight: 900,
-          color: '#2e7d32',
+          color: '#388e3c',
           textAlign: 'center',
-          lineHeight: 1.25,
-          width: isMobile ? '80vw' : 'auto',
-          maxWidth: isMobile ? '70vw' : '380px',
-          minWidth: isMobile ? 'auto' : '280px',
-          minHeight: isMobile ? '60px' : '85px',
+          lineHeight: 1.1,
+          minHeight: '45px',
+          minWidth: '300px',
+          width: 'auto',
+          maxWidth: 'none',
+          overflow: 'visible',
+          whiteSpace: 'nowrap',
         }}
       >
-         Thanh toán thành công
+        <span style={{
+          fontSize: '13px',
+          fontWeight: 700,
+          color: '#388e3c',
+          lineHeight: 1.1,
+          display: 'block',
+          textAlign: 'center',
+          whiteSpace: 'nowrap',
+        }}>
+          Thanh toán thành công
+        </span>
       </div>
       
        
@@ -1507,26 +1837,51 @@ const OrderCard = React.memo(({
       <span style={{ fontWeight: 600 }}>Thời gian:</span>
         <span style={{ fontWeight: 700, color: '#424242' }}>{formatDate(order.createdAt)}</span>
     </div>
-      <table style={{ width: '100%', marginTop: 12, background: '#fafafa', borderRadius: 10, borderCollapse: 'separate', borderSpacing: 0 }}>
-      <thead>
-        <tr>
-      <th style={{ textAlign: 'center', padding: '8px 4px', width: '22%', fontSize: 17, fontWeight: 600, color: '#333', borderBottom: '2px solid #e0e0e0' }}>Tên món</th>
-      <th style={{ textAlign: 'center', padding: '8px 4px', width: '20%', fontSize: 17, fontWeight: 600, color: '#333', borderBottom: '2px solid #e0e0e0' }}>Đơn giá</th>
-      <th style={{ textAlign: 'center', padding: '8px 4px', width: '10%', fontSize: 17, fontWeight: 600, color: '#333', borderBottom: '2px solid #e0e0e0' }}>SL</th>
-      <th style={{ textAlign: 'right', padding: '8px 4px', width: '15%', fontSize: 17, fontWeight: 600, color: '#333', borderBottom: '2px solid #e0e0e0' }}>Tổng</th>
-        </tr>
-      </thead>
-      <tbody>
-        {order.items.map(item => (
-          <tr key={item.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-              <td style={{ textAlign: 'center', padding: '8px 4px', fontSize: 17, fontWeight: 700 }}>{item.foodItemName}</td>
-                <td style={{ textAlign: 'center', padding: '8px 4px', fontSize: 17, fontWeight: 700, color: '#111827' }}>{formatVND(item.price)}</td>
-                <td style={{ textAlign: 'center', padding: '8px 4px', fontSize: 17, fontWeight: 700, color: '#111827' }}>{item.quantity}</td>
-                <td style={{ textAlign: 'right', padding: '8px 4px', fontSize: 17, fontWeight: 700, color: '#111827' }}>{formatVND(item.subtotal)}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+      <div
+        style={{
+          fontFamily: "'Roboto', 'Segoe UI', Arial, sans-serif",
+          fontSize: 15,
+          color: '#222',
+          background: '#fff',
+          borderRadius: 12,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+          padding: 16,
+          margin: 8,
+          border: '1px solid #eee',
+          maxWidth: 400,
+        }}
+      >
+        {/* ...order content... */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', margin: '12px 0', fontFamily: "'Roboto', 'Segoe UI', Arial, sans-serif" }}>
+          <thead>
+            <tr>
+              <th style={{ fontWeight: 600, fontSize: 15, color: '#444', background: '#f3f4f6', padding: '8px 12px', borderBottom: '1px solid #eee', textAlign: 'center', verticalAlign: 'middle' }}>Tên món</th>
+              <th style={{ fontWeight: 600, fontSize: 15, color: '#444', background: '#f3f4f6', padding: '8px 12px', borderBottom: '1px solid #eee', textAlign: 'center', verticalAlign: 'middle' }}>Đơn giá</th>
+              <th style={{ fontWeight: 600, fontSize: 15, color: '#444', background: '#f3f4f6', padding: '8px 12px', borderBottom: '1px solid #eee', textAlign: 'center', verticalAlign: 'middle' }}>SL</th>
+              <th style={{ fontWeight: 600, fontSize: 15, color: '#444', background: '#f3f4f6', padding: '8px 12px', borderBottom: '1px solid #eee', textAlign: 'center', verticalAlign: 'middle' }}>Tổng</th>
+            </tr>
+          </thead>
+          <tbody>
+            {order.items.map((item, index) => (
+              <tr key={item.id || index}>
+                <td style={{ fontWeight: 600, fontSize: 17, color: '#222', padding: '8px 12px', borderBottom: '1px solid #f0f0f0', textAlign: 'center', verticalAlign: 'middle' }}>
+                  {item.foodItemName}
+                </td>
+                <td style={{ fontWeight: 600, fontSize: 17, color: '#222', padding: '8px 12px', borderBottom: '1px solid #f0f0f0', textAlign: 'center', verticalAlign: 'middle' }}>
+                  {formatVND(item.price)}
+                </td>
+                <td style={{ fontWeight: 600, fontSize: 17, color: '#222', padding: '8px 12px', borderBottom: '1px solid #f0f0f0', textAlign: 'center', verticalAlign: 'middle' }}>
+                  {item.quantity}
+                </td>
+                <td style={{ fontWeight: 600, fontSize: 17, color: '#222', padding: '8px 12px', borderBottom: '1px solid #f0f0f0', textAlign: 'center', verticalAlign: 'middle' }}>
+                  {formatVND(item.subtotal)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {/* ...rest of order card... */}
+      </div>
         <div style={{marginTop: 16, textAlign: 'center', fontWeight: 700, fontSize: 18, color: '#111827', padding: '12px', background: '#f8f9fa', borderRadius: 8, border: '2px solid #e9ecef' }}>
           Tổng cộng: <span style={{ color: '#111827', fontWeight: 900, fontSize: 20 }}>{formatVND(order.totalAmount)}</span>
     </div>
@@ -1553,19 +1908,21 @@ const OrderCard = React.memo(({
       >
         <div style={{ 
           display: 'flex', 
-          gap: 8, 
+          flexDirection: 'row',
+          gap: 12, 
           alignItems: 'center', 
+          justifyContent: 'center',
           padding: '0 16px',
           width: '100%',
-          justifyContent: 'center',
-          flexWrap: 'wrap'
+          margin: '8px 0'
         }}>
           <button
             style={{
               background: '#ff9800',
               color: '#fff',
-              fontWeight: 600,
-              fontSize: 14,
+              fontFamily: "'Roboto', 'Segoe UI', Arial, sans-serif",
+              fontWeight: 500,
+              fontSize: 15,
               border: 'none',
               borderRadius: 8,
               padding: '10px 16px',
@@ -1586,13 +1943,13 @@ const OrderCard = React.memo(({
           >
             Điều Chỉnh
           </button>
-          
           <button
             style={{
               background: '#ff9800',
               color: '#fff',
-              fontWeight: 600,
-              fontSize: 14,
+              fontFamily: "'Roboto', 'Segoe UI', Arial, sans-serif",
+              fontWeight: 500,
+              fontSize: 15,
               border: 'none',
               borderRadius: 8,
               padding: '10px 16px',
@@ -1616,7 +1973,6 @@ const OrderCard = React.memo(({
                 const orderMarkedItems = markedItems?.get(order.id);
                 const markedCount = orderMarkedItems?.size || 0;
                 const totalItems = order.items.length;
-                
                 if (markedCount > 0) {
                   return (
                     <span style={{
@@ -1626,8 +1982,8 @@ const OrderCard = React.memo(({
                       background: '#fff',
                       color: '#ff9800',
                       borderRadius: '50%',
-                      width: '16px',
-                      height: '16px',
+                      width: '23px',
+                      height: '20px',
                       display: 'inline-flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -1641,13 +1997,13 @@ const OrderCard = React.memo(({
                 return null;
               })()}
           </button>
-
           <button
             style={{
               background: '#ff9800',
               color: '#fff',
-              fontWeight: 600,
-              fontSize: 14,
+              fontFamily: "'Roboto', 'Segoe UI', Arial, sans-serif",
+              fontWeight: 500,
+              fontSize: 15,
               border: 'none',
               borderRadius: 8,
               padding: '10px 16px',
@@ -1668,8 +2024,6 @@ const OrderCard = React.memo(({
           >
               Thanh Toán
           </button>
-
-
         </div>
       </div>
     )}
@@ -1698,14 +2052,14 @@ const OrderCard = React.memo(({
           <button
             style={{
               position: 'absolute',
-              top: -20,
+              top: -35,
               right: -20,
               background: '#666',
               color: '#fff',
               border: 'none',
-              borderRadius: '50%',
-              width: 32,
-              height: 32,
+              borderRadius: '30%',
+              width: 45,
+              height: 40,
               cursor: 'pointer',
               fontSize: 20,
               display: 'flex',
@@ -1723,7 +2077,8 @@ const OrderCard = React.memo(({
             style={{
               background: '#ff9800',
               color: '#fff',
-              fontWeight: 600,
+              fontFamily: "'Roboto', 'Segoe UI', Arial, sans-serif",
+              fontWeight: 500,
               fontSize: 16,
               border: 'none',
               borderRadius: 10,
@@ -1753,7 +2108,8 @@ const OrderCard = React.memo(({
             style={{
               background: '#ff9800',
               color: '#fff',
-              fontWeight: 600,
+              fontFamily: "'Roboto', 'Segoe UI', Arial, sans-serif",
+              fontWeight: 500,
               fontSize: 16,
               border: 'none',
               borderRadius: 10,
@@ -1895,8 +2251,8 @@ const AdjustOrderModal = ({
           <button
             style={{
               position: 'absolute',
-              top: -4,
-              right: -12,
+              top: 0,
+              right: 0,
               background: 'none',
               border: 'none',
                 fontSize: 32,
@@ -2081,7 +2437,7 @@ const AdjustOrderModal = ({
                               lineHeight: 1.0,
                               padding: 0,
                               margin: 0,
-                              marginTop: -2,
+                              marginTop: 4,
                             }}
                           >
                             ×
@@ -2826,6 +3182,10 @@ const AdjustOrderModal = ({
                           : o
                       )
                     );
+                    
+                    // Clear marked items for this order since it's done
+                    // This will be handled by the parent component via WebSocket
+                    console.log('✅ Order completed, marked items will be cleared via WebSocket');
                     
                     // Close the overlay after successful API call
                     onClose();

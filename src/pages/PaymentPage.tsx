@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { API_BASE_URL } from '../config';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useWebSocket } from '../contexts/WebSocketContext';
 
 interface PaymentDetails {
   id: string;
@@ -29,7 +28,6 @@ const PaymentPage: React.FC = () => {
   const [confirming, setConfirming] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { on, off, isConnected } = useWebSocket();
   
   const paymentId = searchParams.get('paymentId');
   const orderIdFromUrl = searchParams.get('orderId');
@@ -98,28 +96,20 @@ const PaymentPage: React.FC = () => {
           setTableNumbers(numbers);
           
           setLoading(false);
-          return;
-        }
-
-        // If we don't have a paymentId, try to initiate by orderId + method
-        if (orderIdFromUrl && paymentMethodFromUrl) {
-          const initRes = await fetch(`${API_BASE_URL}/api/payments/initiate/${orderIdFromUrl}?method=${paymentMethodFromUrl}`, {
+        } else if (orderIdFromUrl && paymentMethodFromUrl) {
+          // Create new payment
+          const res = await fetch(`${API_BASE_URL}/api/payments/initiate/${orderIdFromUrl}?method=${paymentMethodFromUrl}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
           });
 
-          if (!initRes.ok) {
-            // Try to parse server error message
-            let message = 'Khởi tạo thanh toán thất bại';
-            try {
-              const errBody = await initRes.json();
-              if (errBody && errBody.message) message = errBody.message;
-            } catch {}
-            throw new Error(message);
+          if (!res.ok) {
+            const text = await res.text();
+            throw new Error(text || 'Failed to create payment');
           }
 
-          const rawPayment = await initRes.json();
-          const normalized = extractPaymentFromResponse(rawPayment);
+          const raw = await res.json();
+          const normalized = extractPaymentFromResponse(raw);
           if (!normalized) throw new Error('Invalid payment response');
           setPaymentDetails(normalized);
           
@@ -128,15 +118,11 @@ const PaymentPage: React.FC = () => {
           setTableNumbers(numbers);
           
           setLoading(false);
-          // Replace URL with paymentId for idempotent reloads
-          navigate(`/payment?paymentId=${normalized.id}&method=${paymentMethodFromUrl}`, { replace: true });
-          return;
+        } else {
+          throw new Error('Missing payment ID or order ID');
         }
-
-        setError('Thiếu thông tin thanh toán');
-        setLoading(false);
       } catch (err: any) {
-        console.error('PaymentPage init/fetch error:', err);
+        console.error('Payment fetch/initiate error:', err);
         setError(err?.message || 'Đã xảy ra lỗi khi tải thanh toán');
         setLoading(false);
       }
@@ -145,46 +131,8 @@ const PaymentPage: React.FC = () => {
     fetchOrInitiate();
   }, [paymentId, orderIdFromUrl, paymentMethodFromUrl, navigate]);
 
-  // WebSocket listeners for real-time payment updates
-  useEffect(() => {
-    console.log('💰 Setting up WebSocket listeners for payment updates');
-    console.log('🔌 WebSocket connection status:', isConnected);
-
-    const handlePaymentUpdate = (payment: any) => {
-      console.log('💰 PaymentPage received payment update:', payment);
-      console.log('💰 Payment status:', payment.paymentStatus);
-      
-      // Update payment details if this is the same payment
-      if (payment.id === paymentId) {
-        console.log('💰 Updating payment details with WebSocket data');
-        setPaymentDetails(payment);
-        
-        // If payment is confirmed, just update the UI
-        if (payment.paymentStatus === 'PAID') {
-          console.log('💰 Payment confirmed, UI updated');
-        }
-      }
-    };
-
-    const handleOrderDeleted = (orderId: string) => {
-      console.log('🗑️ PaymentPage received order deletion:', orderId);
-      
-      // If the order for this payment is deleted, navigate back
-      if (paymentDetails && paymentDetails.orderId === orderId) {
-        console.log('🗑️ Order for this payment was deleted, navigating back');
-        navigate('/orders');
-      }
-    };
-
-    on('payment_update', handlePaymentUpdate);
-    on('order_deleted', handleOrderDeleted);
-
-    return () => {
-      console.log('💰 Cleaning up PaymentPage WebSocket listeners');
-      off('payment_update');
-      off('order_deleted');
-    };
-  }, [on, off, paymentId, paymentDetails, navigate, isConnected]);
+  // Removed WebSocket listeners - not needed since user navigates back to orders immediately after payment
+  // OrdersPage will handle all real-time updates via WebSocket
 
   const formatVND = (amount: number) => amount.toLocaleString('vi-VN') + ' VND';
 
@@ -276,19 +224,266 @@ const PaymentPage: React.FC = () => {
     return (
       <div style={{
         minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
         background: '#f5f5f5',
-        fontFamily: 'Segoe UI, Arial, sans-serif'
+        fontFamily: 'Segoe UI, Arial, sans-serif',
+        padding: '20px'
       }}>
+        {/* Header skeleton */}
         <div style={{
-          textAlign: 'center',
-          color: '#1976d2',
-          fontSize: '18px'
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: '24px'
         }}>
-          Đang tải thông tin thanh toán...
+          <div style={{
+            background: '#e0e0e0',
+            borderRadius: '8px',
+            width: '300px',
+            height: '40px',
+            animation: 'pulse 1.5s ease-in-out infinite'
+          }} />
         </div>
+
+        {/* Payment Card skeleton */}
+        <div style={{
+          background: '#fff',
+          borderRadius: '16px',
+          padding: '24px',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+          maxWidth: '600px',
+          margin: '0 auto'
+        }}>
+          {/* Payment Status skeleton */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '24px',
+            padding: '16px',
+            background: '#f8f9fa',
+            borderRadius: '12px',
+            border: '2px solid #e0e0e0'
+          }}>
+            <div>
+              <div style={{
+                background: '#e0e0e0',
+                borderRadius: '4px',
+                width: '200px',
+                height: '24px',
+                marginBottom: '8px',
+                animation: 'pulse 1.5s ease-in-out infinite'
+              }} />
+              <div style={{
+                background: '#e0e0e0',
+                borderRadius: '4px',
+                width: '150px',
+                height: '20px',
+                animation: 'pulse 1.5s ease-in-out infinite'
+              }} />
+            </div>
+            <div>
+              <div style={{
+                background: '#e0e0e0',
+                borderRadius: '4px',
+                width: '120px',
+                height: '16px',
+                marginBottom: '8px',
+                animation: 'pulse 1.5s ease-in-out infinite'
+              }} />
+              <div style={{
+                background: '#e0e0e0',
+                borderRadius: '4px',
+                width: '100px',
+                height: '20px',
+                animation: 'pulse 1.5s ease-in-out infinite'
+              }} />
+            </div>
+          </div>
+
+          {/* Order Details skeleton */}
+          <div style={{ marginBottom: '24px' }}>
+            <div style={{
+              background: '#e0e0e0',
+              borderRadius: '4px',
+              width: '250px',
+              height: '30px',
+              margin: '0 auto 20px auto',
+              animation: 'pulse 1.5s ease-in-out infinite'
+            }} />
+            
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '16px',
+              marginBottom: '16px'
+            }}>
+              <div>
+                <div style={{
+                  background: '#e0e0e0',
+                  borderRadius: '4px',
+                  width: '80px',
+                  height: '20px',
+                  marginBottom: '8px',
+                  animation: 'pulse 1.5s ease-in-out infinite'
+                }} />
+                <div style={{
+                  background: '#e0e0e0',
+                  borderRadius: '4px',
+                  width: '120px',
+                  height: '18px',
+                  animation: 'pulse 1.5s ease-in-out infinite'
+                }} />
+              </div>
+              <div>
+                <div style={{
+                  background: '#e0e0e0',
+                  borderRadius: '4px',
+                  width: '80px',
+                  height: '20px',
+                  marginBottom: '8px',
+                  animation: 'pulse 1.5s ease-in-out infinite'
+                }} />
+                <div style={{
+                  background: '#e0e0e0',
+                  borderRadius: '4px',
+                  width: '140px',
+                  height: '18px',
+                  animation: 'pulse 1.5s ease-in-out infinite'
+                }} />
+              </div>
+            </div>
+
+            {/* Order Items skeleton */}
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{
+                background: '#e0e0e0',
+                borderRadius: '4px',
+                width: '200px',
+                height: '30px',
+                margin: '0 auto 16px auto',
+                animation: 'pulse 1.5s ease-in-out infinite'
+              }} />
+              
+              {[1, 2, 3].map((index) => (
+                <div key={index} style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '12px 0',
+                  borderBottom: index < 3 ? '1px solid #f0f0f0' : 'none'
+                }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{
+                      background: '#e0e0e0',
+                      borderRadius: '4px',
+                      width: '180px',
+                      height: '22px',
+                      marginBottom: '6px',
+                      animation: 'pulse 1.5s ease-in-out infinite'
+                    }} />
+                  </div>
+                  <div style={{
+                    background: '#e0e0e0',
+                    borderRadius: '4px',
+                    width: '100px',
+                    height: '20px',
+                    animation: 'pulse 1.5s ease-in-out infinite'
+                  }} />
+                </div>
+              ))}
+            </div>
+
+            {/* Total skeleton */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '16px',
+              background: '#f8f9fa',
+              borderRadius: '12px',
+              border: '2px solid #e0e0e0'
+            }}>
+              <div style={{
+                background: '#e0e0e0',
+                borderRadius: '4px',
+                width: '120px',
+                height: '24px',
+                animation: 'pulse 1.5s ease-in-out infinite'
+              }} />
+              <div style={{
+                background: '#e0e0e0',
+                borderRadius: '4px',
+                width: '140px',
+                height: '26px',
+                animation: 'pulse 1.5s ease-in-out infinite'
+              }} />
+            </div>
+          </div>
+
+          {/* QR Code skeleton */}
+          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+            <div style={{
+              background: '#e0e0e0',
+              borderRadius: '4px',
+              width: '200px',
+              height: '16px',
+              margin: '0 auto 16px auto',
+              animation: 'pulse 1.5s ease-in-out infinite'
+            }} />
+            <div style={{
+              display: 'inline-block',
+              padding: '16px',
+              background: '#fff',
+              borderRadius: '12px',
+              border: '2px solid #e0e0e0',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+            }}>
+              <div style={{
+                background: '#e0e0e0',
+                borderRadius: '4px',
+                width: '200px',
+                height: '200px',
+                animation: 'pulse 1.5s ease-in-out infinite'
+              }} />
+            </div>
+          </div>
+
+          {/* Action buttons skeleton */}
+          <div style={{
+            display: 'flex',
+            gap: '16px',
+            justifyContent: 'center'
+          }}>
+            <div style={{
+              background: '#e0e0e0',
+              borderRadius: '8px',
+              width: '120px',
+              height: '48px',
+              animation: 'pulse 1.5s ease-in-out infinite'
+            }} />
+            <div style={{
+              background: '#e0e0e0',
+              borderRadius: '8px',
+              width: '120px',
+              height: '48px',
+              animation: 'pulse 1.5s ease-in-out infinite'
+            }} />
+          </div>
+        </div>
+        
+        <style>{`
+          @keyframes pulse {
+            0% {
+              opacity: 1;
+            }
+            50% {
+              opacity: 0.5;
+            }
+            100% {
+              opacity: 1;
+            }
+          }
+        `}</style>
       </div>
     );
   }
@@ -319,83 +514,70 @@ const PaymentPage: React.FC = () => {
       minHeight: '100vh',
       background: '#f5f5f5',
       fontFamily: 'Segoe UI, Arial, sans-serif',
-      padding: '20px'
+      padding: '16px'
     }}>
-      {/* Header */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: '24px'
-      }}>
-        <h1 style={{
-          fontSize: '32px',
-          fontWeight: 700,
-          color: '#263238',
-          margin: 0
-        }}>
-          Chi Tiết Thanh Toán
-        </h1>
-      </div>
-
       {/* Payment Card */}
       <div style={{
         background: '#fff',
-        borderRadius: '16px',
+        borderRadius: '20px',
         padding: '24px',
-        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
-        maxWidth: '600px',
-        margin: '0 auto'
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
+        maxWidth: '500px',
+        margin: '0 auto',
+        marginTop: '20px'
       }}>
-        {/* Payment Status */}
+        {/* Payment Status Header */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: '24px',
-          padding: '16px',
+          marginBottom: '32px',
+          padding: '20px',
           background: '#f8f9fa',
-          borderRadius: '12px',
+          borderRadius: '16px',
           border: `2px solid ${getStatusColor(paymentDetails.paymentStatus)}`
         }}>
           <div>
             <div style={{
-              fontSize: '20px',
+              fontSize: '18px',
               fontWeight: 600,
               color: '#263238',
-              marginBottom: '6px'
+              marginBottom: '8px'
             }}>
               Trạng Thái Thanh Toán
             </div>
             <div style={{
-              fontSize: '18px',
+              fontSize: '20px',
               color: getStatusColor(paymentDetails.paymentStatus),
-              fontWeight: 600
+              fontWeight: 700
             }}>
               {getPaymentStatusLabel(paymentDetails.paymentStatus)}
             </div>
           </div>
           <div style={{
-           fontSize: '20px',
-           
-            color: '#666',
             textAlign: 'right'
           }}>
-            <div>Phương Thức</div>
-            <div style={{ fontWeight: 600, color: '#263238', fontSize: '18px' }}>
+            <div style={{ fontSize: '16px', color: '#666', marginBottom: '4px' }}>
+              Phương Thức
+            </div>
+            <div style={{ 
+              fontWeight: 600, 
+              color: '#263238', 
+              fontSize: '18px' 
+            }}>
               {getPaymentMethodLabel(paymentDetails.paymentMethod)}
             </div>
           </div>
         </div>
 
-        {/* Order Details */}
-        <div style={{ marginBottom: '24px' }}>
+        {/* Order Information */}
+        <div style={{ marginBottom: '32px' }}>
           <h3 style={{
-            fontSize: '24px',
-            fontWeight: 600,
+            fontSize: '22px',
+            fontWeight: 700,
             color: '#263238',
-            marginBottom: '20px',
-            textAlign:'center'
+            marginBottom: '24px',
+            textAlign: 'center'
           }}>
             Thông Tin Đơn Hàng
           </h3>
@@ -403,37 +585,55 @@ const PaymentPage: React.FC = () => {
           <div style={{
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
-            gap: '16px',
-            marginBottom: '16px'
+            gap: '20px',
+            marginBottom: '24px'
           }}>
             <div>
-              <div style={{ fontSize: '20px', color: '#666', marginBottom: '6px' }}>
+              <div style={{ 
+                fontSize: '16px', 
+                color: '#666', 
+                marginBottom: '8px',
+                fontWeight: 500
+              }}>
                 Số Bàn:
               </div>
-              <div style={{ fontSize: '18px', fontWeight: 600, color: '#263238' }}>
+              <div style={{ 
+                fontSize: '18px', 
+                fontWeight: 700, 
+                color: '#263238' 
+              }}>
                 {tableNumbers.length > 0 
                   ? `Bàn ${tableNumbers.join(', ')}` 
                   : 'Đang tải thông tin bàn...'}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: '20px', color: '#666', marginBottom: '6px' }}>
+              <div style={{ 
+                fontSize: '16px', 
+                color: '#666', 
+                marginBottom: '8px',
+                fontWeight: 500
+              }}>
                 Ngày Tạo:
               </div>
-              <div style={{ fontSize: '18px', fontWeight: 600, color: '#263238' }}>
+              <div style={{ 
+                fontSize: '18px', 
+                fontWeight: 700, 
+                color: '#263238' 
+              }}>
                 {formatDate(paymentDetails.orderCreatedAt)}
               </div>
             </div>
           </div>
 
           {/* Order Items */}
-          <div style={{ marginBottom: '16px' }}>
+          <div style={{ marginBottom: '24px' }}>
             <div style={{
-              fontSize: '24px',
-              fontWeight: 600,
+              fontSize: '22px',
+              fontWeight: 700,
               color: '#263238',
-              marginBottom: '16px',
-              textAlign:'center'
+              marginBottom: '20px',
+              textAlign: 'center'
             }}>
               Chi Tiết Món Ăn:
             </div>
@@ -442,22 +642,22 @@ const PaymentPage: React.FC = () => {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                padding: '12px 0',
+                padding: '16px 0',
                 borderBottom: index < ((paymentDetails.items?.length ?? 0) - 1) ? '1px solid #f0f0f0' : 'none'
               }}>
                 <div style={{ flex: 1 }}>
                   <div style={{
-                    fontSize: '22px',
+                    fontSize: '20px',
                     fontWeight: 600,
                     color: '#263238',
-                    marginBottom: '6px'
+                    marginBottom: '4px'
                   }}>
                     {item.foodItemName} × {item.quantity}
                   </div>
                 </div>
                 <div style={{
                   fontSize: '20px',
-                  fontWeight: 600,
+                  fontWeight: 700,
                   color: '#ff9800'
                 }}>
                   {formatVND(item.subtotal)}
@@ -471,21 +671,21 @@ const PaymentPage: React.FC = () => {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            padding: '16px',
-            background: '#f8f9fa',
-            borderRadius: '12px',
+            padding: '20px',
+            background: '#fff3e0',
+            borderRadius: '16px',
             border: '2px solid #ff9800'
           }}>
             <div style={{
-              fontSize: '24px',
-              fontWeight: 600,
+              fontSize: '22px',
+              fontWeight: 700,
               color: '#263238'
             }}>
               Tổng Cộng
             </div>
             <div style={{
-              fontSize: '26px',
-              fontWeight: 700,
+              fontSize: '24px',
+              fontWeight: 800,
               color: '#ff9800'
             }}>
               {formatVND(paymentDetails.totalAmount)}
@@ -495,56 +695,32 @@ const PaymentPage: React.FC = () => {
 
         {/* QR Code for Bank Transfer Only */}
         {paymentDetails.paymentMethod === 'BANK_TRANSFER' && paymentDetails.img && (
-          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
             <div style={{
-              fontSize: '16px',
+              fontSize: '18px',
               fontWeight: 600,
               color: '#263238',
-              marginBottom: '16px'
+              marginBottom: '20px'
             }}>
               Quét Mã QR Để Thanh Toán
             </div>
             <div style={{
               display: 'inline-block',
-              padding: '16px',
+              padding: '20px',
               background: '#fff',
-              borderRadius: '12px',
+              borderRadius: '16px',
               border: '2px solid #e0e0e0',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)'
             }}>
               <img
                 src={paymentDetails.img}
                 alt="QR Code"
                 style={{
-                  width: '200px',
-                  height: '200px',
-                  objectFit: 'contain'
+                  width: '220px',
+                  height: '220px',
+                  borderRadius: '12px'
                 }}
               />
-            </div>
-            <div style={{
-              fontSize: '14px',
-              color: '#666',
-              marginTop: '12px'
-            }}>
-              Sử dụng ứng dụng ngân hàng để quét mã QR và hoàn tất thanh toán
-            </div>
-          </div>
-        )}
-
-        {/* Cash Payment Instructions */}
-        {paymentDetails.paymentMethod === 'CASH' && (
-          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-           
-            <div style={{
-                padding: '20px',
-              background: '#f8f9fa',
-              borderRadius: '12px',
-              border: '2px solid #ff9800',
-              color: '#666',
-              fontSize: '18px'
-            }}>
-              Vui lòng thu tiền từ khách hàng và xác nhận thanh toán
             </div>
           </div>
         )}
@@ -552,25 +728,25 @@ const PaymentPage: React.FC = () => {
         {/* Action Buttons */}
         <div style={{
           display: 'flex',
-          gap: '12px',
+          gap: '16px',
           justifyContent: 'center'
         }}>
           <button
             onClick={() => navigate('/orders')}
             style={{
-              background: '#ff9800',
+              background: '#666',
               color: '#fff',
               fontWeight: 600,
-              fontSize: '15px',
+              fontSize: '16px',
               border: 'none',
-              borderRadius: '8px',
-              padding: '14px 28px',
+              borderRadius: '12px',
+              padding: '16px 32px',
               cursor: 'pointer',
-              transition: 'background 0.2s',
-              minWidth: '150px',
+              transition: 'all 0.2s',
+              minWidth: '140px'
             }}
-            onMouseOver={e => (e.currentTarget.style.background = '#fb8c00')}
-            onMouseOut={e => (e.currentTarget.style.background = '#ff9800')}
+            onMouseOver={e => (e.currentTarget.style.background = '#555')}
+            onMouseOut={e => (e.currentTarget.style.background = '#666')}
           >
             Quay Lại
           </button>
@@ -580,29 +756,25 @@ const PaymentPage: React.FC = () => {
               onClick={handleConfirmPayment}
               disabled={confirming}
               style={{
-                background: confirming ? '#ccc' : '#ff9800',
+                background: confirming ? '#ccc' : '#4caf50',
                 color: '#fff',
                 fontWeight: 600,
-                fontSize: '15px',
+                fontSize: '16px',
                 border: 'none',
-                borderRadius: '8px',
-                padding: '14px 28px',
+                borderRadius: '12px',
+                padding: '16px 32px',
                 cursor: confirming ? 'not-allowed' : 'pointer',
-                transition: 'background 0.2s',
-                minWidth: '150px',
+                transition: 'all 0.2s',
+                minWidth: '140px'
               }}
               onMouseOver={e => {
-                if (!confirming) {
-                  e.currentTarget.style.background = '#fb8c00';
-                }
+                if (!confirming) e.currentTarget.style.background = '#45a049';
               }}
               onMouseOut={e => {
-                if (!confirming) {
-                  e.currentTarget.style.background = '#ff9800';
-                }
+                if (!confirming) e.currentTarget.style.background = '#4caf50';
               }}
             >
-              {confirming ? 'Đang xác nhận...' : 'Đã Thanh Toán'}
+              {confirming ? 'Đang Xác Nhận...' : 'Xác Nhận Thanh Toán'}
             </button>
           )}
         </div>
