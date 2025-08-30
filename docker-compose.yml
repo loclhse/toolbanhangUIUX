@@ -3,5 +3,5 @@ services:
   frontend:
     build: .
     ports:
-      - "8081:80"
+      - "82:82"
     restart: always

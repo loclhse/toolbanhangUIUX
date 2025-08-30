@@ -2,9 +2,6 @@ import SockJS from 'sockjs-client';
 import { Stomp } from '@stomp/stompjs';
 import { WS_BASE_URL } from '../config';
 
-// Check if we're in development mode
-const isDevelopment = import.meta.env.DEV || window.location.hostname === 'localhost';
-
 class WebSocketService {
       private stompClient: any = null;
     private isConnected = false;
@@ -59,11 +56,10 @@ class WebSocketService {
         return;
       }
       
-      // Enable debug only in development
-      const isDevelopment = import.meta.env.DEV || window.location.hostname === 'localhost';
-      this.stompClient.debug = isDevelopment ? (str: string) => {
+      // Enable debug logging
+      this.stompClient.debug = (str: string) => {
         console.log('🔍 STOMP Debug:', str);
-      } : undefined;
+      };
 
       // Cấu hình heartbeat và auto-reconnect cơ bản (CompatClient API)
       this.stompClient.reconnectDelay = 5000;
