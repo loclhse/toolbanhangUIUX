@@ -681,14 +681,14 @@ const formatDate = (dateString: string) => {
             border: '2px solid #ff9800'
           }}>
             <div style={{
-              fontSize: '20px',
+              fontSize: '13px',
               fontWeight: 700,
               color: '#263238'
             }}>
-              Tổng Cộng
+              Tổng Cộng:
             </div>
             <div style={{
-              fontSize: '22px',
+              fontSize: '19px',
               fontWeight: 800,
               color: '#ff9800'
             }}>
