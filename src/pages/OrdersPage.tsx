@@ -2458,7 +2458,7 @@ const AdjustOrderModal = ({
                               lineHeight: 1.0,
                               padding: 0,
                               margin: 0,
-                              marginTop: 4,
+                              marginTop: 0,
                             }}
                           >
                             ×
