@@ -132,7 +132,7 @@ const OrderModal: React.FC<OrderModalProps> = ({ open, tableId, tableIds = [], o
   };
 
   // Helper to format VND
-  const formatVND = (amount: number) => amount.toLocaleString('vi-VN') + ' VND';
+  const formatVND = (amount: number) => amount.toLocaleString('vi-VN') + 'đ';
 
   // Calculate total
   const total = orderItems.reduce((sum, oi) => {
@@ -153,6 +153,8 @@ const OrderModal: React.FC<OrderModalProps> = ({ open, tableId, tableIds = [], o
           : (isMobile ? styles.mobileModal : styles.modal)
         )
       }}>
+
+        
         {/* Header */}
         <div style={styles.header}>
           <h2 style={{
@@ -456,11 +458,11 @@ const styles: { [key: string]: React.CSSProperties } = {
     height: '100vh',
     background: 'rgba(0,0,0,0.5)',
     display: 'flex',
-    alignItems: 'stretch',
-    justifyContent: 'stretch',
+    alignItems: 'center',
+    justifyContent: 'center',
     zIndex: 1000,
     fontFamily: 'Segoe UI, Arial, sans-serif',
-    padding: '0px',
+    padding: '16px',
     boxSizing: 'border-box',
   },
   modal: {
@@ -478,10 +480,17 @@ const styles: { [key: string]: React.CSSProperties } = {
     border: '1px solid #f0f0f0',
   },
   mobileModal: {
-    maxWidth: '100vw',
-    maxHeight: '100vh',
-    margin: '0px',
-    borderRadius: '0px',
+    background: '#fff',
+    width: '100%',
+    maxWidth: '400px',
+    maxHeight: '85vh',
+    borderRadius: '16px',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+    position: 'relative',
+    fontFamily: 'Segoe UI, Arial, sans-serif',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
   },
   mobileMenuItem: {
     display: 'flex',
@@ -593,13 +602,14 @@ const styles: { [key: string]: React.CSSProperties } = {
     cursor: 'pointer',
     color: '#666',
     transition: 'color 0.2s',
-    padding: '4px',
+    padding: '6px',
     borderRadius: '50%',
-    width: '32px',
-    height: '32px',
+    width: '40px',
+    height: '40px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    fontSize: '20px',
   },
   peopleSection: {
     padding: '20px 24px',

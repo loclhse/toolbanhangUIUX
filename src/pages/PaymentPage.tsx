@@ -134,9 +134,11 @@ const PaymentPage: React.FC = () => {
   // Removed WebSocket listeners - not needed since user navigates back to orders immediately after payment
   // OrdersPage will handle all real-time updates via WebSocket
 
-  const formatVND = (amount: number) => amount.toLocaleString('vi-VN') + ' VND';
+  const formatVND = (amount: number) => amount.toLocaleString('vi-VN');
 
-  const formatDate = (dateString: string) => {
+const formatVNDWithCurrency = (amount: number) => amount.toLocaleString('vi-VN') + ' Đồng';
+
+const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     
     // Convert to local timezone
@@ -514,40 +516,42 @@ const PaymentPage: React.FC = () => {
       minHeight: '100vh',
       background: '#f5f5f5',
       fontFamily: 'Segoe UI, Arial, sans-serif',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
       padding: '16px'
     }}>
       {/* Payment Card */}
       <div style={{
         background: '#fff',
-        borderRadius: '20px',
-        padding: '24px',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)',
-        maxWidth: '500px',
-        margin: '0 auto',
-        marginTop: '20px'
+        borderRadius: '16px',
+        padding: '20px',
+        boxShadow: '0 6px 24px rgba(0, 0, 0, 0.08)',
+        maxWidth: '480px',
+        width: '100%'
       }}>
         {/* Payment Status Header */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: '32px',
-          padding: '20px',
+          marginBottom: '24px',
+          padding: '16px',
           background: '#f8f9fa',
-          borderRadius: '16px',
+          borderRadius: '12px',
           border: `2px solid ${getStatusColor(paymentDetails.paymentStatus)}`
         }}>
           <div>
             <div style={{
-              fontSize: '18px',
+              fontSize: '16px',
               fontWeight: 600,
               color: '#263238',
-              marginBottom: '8px'
+              marginBottom: '6px'
             }}>
               Trạng Thái Thanh Toán
             </div>
             <div style={{
-              fontSize: '20px',
+              fontSize: '18px',
               color: getStatusColor(paymentDetails.paymentStatus),
               fontWeight: 700
             }}>
@@ -557,13 +561,13 @@ const PaymentPage: React.FC = () => {
           <div style={{
             textAlign: 'right'
           }}>
-            <div style={{ fontSize: '16px', color: '#666', marginBottom: '4px' }}>
+            <div style={{ fontSize: '14px', color: '#666', marginBottom: '3px' }}>
               Phương Thức
             </div>
             <div style={{ 
               fontWeight: 600, 
               color: '#263238', 
-              fontSize: '18px' 
+              fontSize: '16px' 
             }}>
               {getPaymentMethodLabel(paymentDetails.paymentMethod)}
             </div>
@@ -571,12 +575,12 @@ const PaymentPage: React.FC = () => {
         </div>
 
         {/* Order Information */}
-        <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '24px' }}>
           <h3 style={{
-            fontSize: '22px',
+            fontSize: '20px',
             fontWeight: 700,
             color: '#263238',
-            marginBottom: '24px',
+            marginBottom: '20px',
             textAlign: 'center'
           }}>
             Thông Tin Đơn Hàng
@@ -585,20 +589,20 @@ const PaymentPage: React.FC = () => {
           <div style={{
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
-            gap: '20px',
-            marginBottom: '24px'
+            gap: '16px',
+            marginBottom: '20px'
           }}>
             <div>
               <div style={{ 
-                fontSize: '16px', 
+                fontSize: '14px', 
                 color: '#666', 
-                marginBottom: '8px',
+                marginBottom: '6px',
                 fontWeight: 500
               }}>
                 Số Bàn:
               </div>
               <div style={{ 
-                fontSize: '18px', 
+                fontSize: '16px', 
                 fontWeight: 700, 
                 color: '#263238' 
               }}>
@@ -609,15 +613,15 @@ const PaymentPage: React.FC = () => {
             </div>
             <div>
               <div style={{ 
-                fontSize: '16px', 
+                fontSize: '14px', 
                 color: '#666', 
-                marginBottom: '8px',
+                marginBottom: '6px',
                 fontWeight: 500
               }}>
                 Ngày Tạo:
               </div>
               <div style={{ 
-                fontSize: '18px', 
+                fontSize: '16px', 
                 fontWeight: 700, 
                 color: '#263238' 
               }}>
@@ -627,12 +631,12 @@ const PaymentPage: React.FC = () => {
           </div>
 
           {/* Order Items */}
-          <div style={{ marginBottom: '24px' }}>
+          <div style={{ marginBottom: '20px' }}>
             <div style={{
-              fontSize: '22px',
+              fontSize: '20px',
               fontWeight: 700,
               color: '#263238',
-              marginBottom: '20px',
+              marginBottom: '16px',
               textAlign: 'center'
             }}>
               Chi Tiết Món Ăn:
@@ -642,21 +646,21 @@ const PaymentPage: React.FC = () => {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                padding: '16px 0',
+                padding: '12px 0',
                 borderBottom: index < ((paymentDetails.items?.length ?? 0) - 1) ? '1px solid #f0f0f0' : 'none'
               }}>
                 <div style={{ flex: 1 }}>
                   <div style={{
-                    fontSize: '20px',
+                    fontSize: '18px',
                     fontWeight: 600,
                     color: '#263238',
-                    marginBottom: '4px'
+                    marginBottom: '3px'
                   }}>
                     {item.foodItemName} × {item.quantity}
                   </div>
                 </div>
                 <div style={{
-                  fontSize: '20px',
+                  fontSize: '18px',
                   fontWeight: 700,
                   color: '#ff9800'
                 }}>
@@ -671,54 +675,54 @@ const PaymentPage: React.FC = () => {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            padding: '20px',
+            padding: '16px',
             background: '#fff3e0',
-            borderRadius: '16px',
+            borderRadius: '12px',
             border: '2px solid #ff9800'
           }}>
             <div style={{
-              fontSize: '22px',
+              fontSize: '20px',
               fontWeight: 700,
               color: '#263238'
             }}>
               Tổng Cộng
             </div>
             <div style={{
-              fontSize: '24px',
+              fontSize: '22px',
               fontWeight: 800,
               color: '#ff9800'
             }}>
-              {formatVND(paymentDetails.totalAmount)}
+              {formatVNDWithCurrency(paymentDetails.totalAmount)}
             </div>
           </div>
         </div>
 
         {/* QR Code for Bank Transfer Only */}
         {paymentDetails.paymentMethod === 'BANK_TRANSFER' && paymentDetails.img && (
-          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
             <div style={{
-              fontSize: '18px',
+              fontSize: '16px',
               fontWeight: 600,
               color: '#263238',
-              marginBottom: '20px'
+              marginBottom: '16px'
             }}>
               Quét Mã QR Để Thanh Toán
             </div>
             <div style={{
               display: 'inline-block',
-              padding: '20px',
+              padding: '16px',
               background: '#fff',
-              borderRadius: '16px',
+              borderRadius: '12px',
               border: '2px solid #e0e0e0',
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)'
+              boxShadow: '0 3px 12px rgba(0, 0, 0, 0.08)'
             }}>
               <img
                 src={paymentDetails.img}
                 alt="QR Code"
                 style={{
-                  width: '220px',
-                  height: '220px',
-                  borderRadius: '12px'
+                  width: '200px',
+                  height: '200px',
+                  borderRadius: '10px'
                 }}
               />
             </div>
@@ -728,8 +732,9 @@ const PaymentPage: React.FC = () => {
         {/* Action Buttons */}
         <div style={{
           display: 'flex',
-          gap: '16px',
-          justifyContent: 'center'
+          gap: window.innerWidth <= 768 ? '12px' : '16px',
+          justifyContent: 'center',
+          padding: window.innerWidth <= 768 ? '0 16px' : '0'
         }}>
           <button
             onClick={() => navigate('/orders')}
@@ -737,13 +742,14 @@ const PaymentPage: React.FC = () => {
               background: '#666',
               color: '#fff',
               fontWeight: 600,
-              fontSize: '16px',
+              fontSize: window.innerWidth <= 768 ? '14px' : '16px',
               border: 'none',
-              borderRadius: '12px',
-              padding: '16px 32px',
+              borderRadius: window.innerWidth <= 768 ? '8px' : '12px',
+              padding: window.innerWidth <= 768 ? '12px 20px' : '16px 32px',
               cursor: 'pointer',
               transition: 'all 0.2s',
-              minWidth: '140px'
+              minWidth: window.innerWidth <= 768 ? '100px' : '140px',
+              flex: window.innerWidth <= 768 ? '1' : 'auto'
             }}
             onMouseOver={e => (e.currentTarget.style.background = '#555')}
             onMouseOut={e => (e.currentTarget.style.background = '#666')}
@@ -759,13 +765,14 @@ const PaymentPage: React.FC = () => {
                 background: confirming ? '#ccc' : '#4caf50',
                 color: '#fff',
                 fontWeight: 600,
-                fontSize: '16px',
+                fontSize: window.innerWidth <= 768 ? '14px' : '16px',
                 border: 'none',
-                borderRadius: '12px',
-                padding: '16px 32px',
+                borderRadius: window.innerWidth <= 768 ? '8px' : '12px',
+                padding: window.innerWidth <= 768 ? '12px 20px' : '16px 32px',
                 cursor: confirming ? 'not-allowed' : 'pointer',
                 transition: 'all 0.2s',
-                minWidth: '140px'
+                minWidth: window.innerWidth <= 768 ? '100px' : '140px',
+                flex: window.innerWidth <= 768 ? '1' : 'auto'
               }}
               onMouseOver={e => {
                 if (!confirming) e.currentTarget.style.background = '#45a049';

@@ -28,7 +28,11 @@ interface FoodItem {
   price: number;
 }
 
-const formatVND = (amount: number) => amount.toLocaleString('vi-VN') + ' VND';
+const formatVND = (amount: number) => amount.toLocaleString('vi-VN') + 'đ';
+
+const formatVNDForTotal = (amount: number) => amount.toLocaleString('vi-VN');
+
+const formatVNDForTable = (amount: number) => amount.toLocaleString('vi-VN');
 
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
@@ -700,15 +704,23 @@ const OrdersPage: React.FC = () => {
   // Fetch all tables for table selection
   useEffect(() => {
     if (showAdjustForm) {
+      console.log('📋 Loading tables for adjustment form...');
       fetch(`${API_BASE_URL}/api/tables`)
         .then((res) => res.json())
-        .then((data) => setTables(data.data || []));
+        .then((data) => {
+          console.log('📋 Loaded tables:', data.data);
+          setTables(data.data || []);
+        })
+        .catch((error) => {
+          console.error('❌ Error loading tables:', error);
+          setTables([]);
+        });
     }
   }, [showAdjustForm]);
 
   // Initialize form data when order details are loaded
   useEffect(() => {
-      if (adjustOrderDetails && showAdjustForm && foodItems.length > 0 && !submitting) {
+      if (adjustOrderDetails && showAdjustForm && foodItems.length > 0 && tables.length > 0 && !submitting) {
       console.log('Order details:', adjustOrderDetails);
       console.log('Order items:', adjustOrderDetails.items);
       console.log('Food items:', foodItems);
@@ -757,7 +769,7 @@ const OrdersPage: React.FC = () => {
         items: mappedItems as { foodItemId: string; quantity: number }[]
       });
     }
-    }, [adjustOrderDetails, showAdjustForm, foodItems, submitting]);
+    }, [adjustOrderDetails, showAdjustForm, foodItems, tables, submitting]);
 
   const handleQuantityChange = (foodItemId: string, quantity: number) => {
     setAdjustFormData(prev => {
@@ -1373,24 +1385,23 @@ const OrdersPage: React.FC = () => {
       
        
         )}
-      <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <div style={{ display: 'flex', gap: '24px', alignItems: 'center', }}>
+      <div style={{ width: '100%', display: 'flex', justifyContent: 'space-evenly', alignItems: 'center', marginBottom: 24 }}>
         <button
           onClick={() => navigate('/')}
           style={{
             background: '#ff9800',
             color: '#fff',
-            fontWeight: 600,
-            fontSize: 15,
+            fontWeight: 550,
+            fontSize: 12,
             border: 'none',
-            borderRadius: 8,
-            padding: '8px 20px',
+            borderRadius: 6,
+            padding: '6px 14px',
             cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(255, 152, 0, 0.08)',
-            letterSpacing: 1,
+            boxShadow: '0 2px 6px rgba(255, 152, 0, 0.08)',
+            letterSpacing: 0.5,
             transition: 'background 0.2s',
-                minWidth: '120px',
-                textAlign: 'center',
+            minWidth: '90px',
+            textAlign: 'center',
           }}
           onMouseOver={e => (e.currentTarget.style.background = '#fb8c00')}
           onMouseOut={e => (e.currentTarget.style.background = '#ff9800')}
@@ -1398,29 +1409,28 @@ const OrdersPage: React.FC = () => {
           Quay lại
         </button>
             
-            <button
-              onClick={() => navigate('/revenue')}
-              style={{
-                background: '#ff9800',
-                color: '#fff',
-                fontWeight: 600,
-                fontSize: 15,
-                border: 'none',
-                borderRadius: 8,
-                padding: '8px 20px',
-                cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(255, 152, 0, 0.08)',
-                letterSpacing: 1,
-                transition: 'background 0.2s',
-                minWidth: '120px',
-                textAlign: 'center',
-              }}
-              onMouseOver={e => (e.currentTarget.style.background = '#fb8c00')}
-              onMouseOut={e => (e.currentTarget.style.background = '#ff9800')}
-            >
-              Doanh Thu
-            </button>
-          </div>
+        <button
+          onClick={() => navigate('/revenue')}
+          style={{
+            background: '#ff9800',
+            color: '#fff',
+            fontWeight: 550,
+            fontSize: 12,
+            border: 'none',
+            borderRadius: 6,
+            padding: '6px 14px',
+            cursor: 'pointer',
+            boxShadow: '0 2px 6px rgba(255, 152, 0, 0.08)',
+            letterSpacing: 0.5,
+            transition: 'background 0.2s',
+            minWidth: '90px',
+            textAlign: 'center',
+          }}
+          onMouseOver={e => (e.currentTarget.style.background = '#fb8c00')}
+          onMouseOut={e => (e.currentTarget.style.background = '#ff9800')}
+        >
+          Doanh Thu
+        </button>
         
         {/* WebSocket Connection Status */}
         <div style={{
@@ -1439,7 +1449,6 @@ const OrdersPage: React.FC = () => {
             animation: isConnected ? 'none' : 'pulse 2s infinite',
           }} />
           {isConnected ? 'Đã kết nối' : 'Đang kết nối'}
-          
         </div>
       </div>
               
@@ -1827,15 +1836,21 @@ const OrderCard = React.memo(({
 
       </div>
     </div>
-    <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 18, fontSize: 18 }}>
-      <span style={{ fontWeight: 600 }}>Bàn:</span>
-        <span style={{ fontWeight: 700, color: '#424242' }}>{order.tableNumbers.join(', ')}</span>
-      <span style={{ fontWeight: 600, color: '#666' }}>|</span>
-      <span style={{ fontWeight: 600 }}>Số người:</span>
-        <span style={{ fontWeight: 700, color: '#424242' }}>{order.numberOfPeople}</span>
-      <span style={{ fontWeight: 600, color: '#666' }}>|</span>
-      <span style={{ fontWeight: 600 }}>Thời gian:</span>
-        <span style={{ fontWeight: 700, color: '#424242' }}>{formatDate(order.createdAt)}</span>
+    <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, fontSize: 14, flexWrap: 'wrap', padding: '0 4px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <span style={{ fontWeight: 600, fontSize: 18 }}>Bàn:</span>
+        <span style={{ fontWeight: 700, color: '#424242', fontSize: 18 }}>{order.tableNumbers.join(', ')}</span>
+      </div>
+      <span style={{ fontWeight: 600, color: '#666', fontSize: 14 }}>|</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <span style={{ fontWeight: 600, fontSize: 18 }}>Số người:</span>
+        <span style={{ fontWeight: 700, color: '#424242', fontSize: 18 }}>{order.numberOfPeople}</span>
+      </div>
+      
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <span style={{ fontWeight: 600, fontSize: 18 }}>Thời gian:</span>
+        <span style={{ fontWeight: 700, color: '#424242', fontSize: 18 }}>{formatDate(order.createdAt)}</span>
+      </div>
     </div>
       <div
         style={{
@@ -1845,10 +1860,12 @@ const OrderCard = React.memo(({
           background: '#fff',
           borderRadius: 12,
           boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-          padding: 16,
-          margin: 8,
+          padding: 10,
+          margin: 4,
           border: '1px solid #eee',
-          maxWidth: 400,
+          maxWidth: '100%',
+          overflow: 'hidden',
+          boxSizing: 'border-box',
         }}
       >
         {/* ...order content... */}
@@ -1868,13 +1885,13 @@ const OrderCard = React.memo(({
                   {item.foodItemName}
                 </td>
                 <td style={{ fontWeight: 600, fontSize: 17, color: '#222', padding: '8px 12px', borderBottom: '1px solid #f0f0f0', textAlign: 'center', verticalAlign: 'middle' }}>
-                  {formatVND(item.price)}
+                  {formatVNDForTable(item.price)}
                 </td>
                 <td style={{ fontWeight: 600, fontSize: 17, color: '#222', padding: '8px 12px', borderBottom: '1px solid #f0f0f0', textAlign: 'center', verticalAlign: 'middle' }}>
                   {item.quantity}
                 </td>
                 <td style={{ fontWeight: 600, fontSize: 17, color: '#222', padding: '8px 12px', borderBottom: '1px solid #f0f0f0', textAlign: 'center', verticalAlign: 'middle' }}>
-                  {formatVND(item.subtotal)}
+                  {formatVNDForTable(item.subtotal)}
                 </td>
               </tr>
             ))}
@@ -1882,8 +1899,8 @@ const OrderCard = React.memo(({
         </table>
         {/* ...rest of order card... */}
       </div>
-        <div style={{marginTop: 16, textAlign: 'center', fontWeight: 700, fontSize: 18, color: '#111827', padding: '12px', background: '#f8f9fa', borderRadius: 8, border: '2px solid #e9ecef' }}>
-          Tổng cộng: <span style={{ color: '#111827', fontWeight: 900, fontSize: 20 }}>{formatVND(order.totalAmount)}</span>
+        <div style={{marginTop: 16, textAlign: 'center', fontWeight: 800, fontSize: 18, color: '#fff', padding: '12px', background: '#ff9800', borderRadius: 8, border: '2px solid #f57c00', textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)' }}>
+          Tổng cộng: <span style={{ color: '#fff', fontWeight: 900, fontSize: 22, textShadow: '0 1px 3px rgba(0, 0, 0, 0.4)' }}>{formatVNDForTotal(order.totalAmount)} <span style={{ fontSize: 17, fontWeight: 700 }}>Đồng</span></span>
     </div>
   </div>
     
@@ -2236,15 +2253,19 @@ const AdjustOrderModal = ({
           borderBottom: '2px solid #f0f0f0',
         }}>
           <h2 style={{ 
-            fontSize: 24, 
+            fontSize: 19, 
             fontWeight: 700, 
             color: '#263238', 
-            margin: 0,
+            margin: '12px 0 0 0',
             letterSpacing: 0.5, 
             textAlign: 'center',
             textRendering: 'optimizeLegibility',
             WebkitFontSmoothing: 'antialiased',
             MozOsxFontSmoothing: 'grayscale',
+            width: '100%',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
           }}>
             Điều Chỉnh Đơn Hàng
           </h2>
@@ -2583,7 +2604,7 @@ const AdjustOrderModal = ({
                             fontSize: 15,
                           whiteSpace: 'nowrap'
                         }}>
-                          SL: {orderItem.quantity} | {(foodItem.price * orderItem.quantity).toLocaleString('vi-VN')} VND
+                          SL: {orderItem.quantity} | {(foodItem.price * orderItem.quantity).toLocaleString('vi-VN')} Đồng
                         </span>
                       </div>
                      ) : null;
@@ -2698,7 +2719,7 @@ const AdjustOrderModal = ({
                              fontSize: 14, 
                                 color: '#111827' 
                            }}>
-                             {formatVND(item.price)}
+                             {formatVNDForTable(item.price)}
                            </div>
                          </div>
 
@@ -2813,17 +2834,17 @@ const AdjustOrderModal = ({
                   background: '#ff9800',
                   color: '#fff',
                   fontWeight: 600,
-                  fontSize: 18,
+                  fontSize: 16,
                   border: 'none',
                   borderRadius: 8,
-                  padding: '16px 32px',
+                  padding: '12px 24px',
                   cursor: submitting || adjustFormData.items.length === 0 ? 'not-allowed' : 'pointer',
                   opacity: submitting || adjustFormData.items.length === 0 ? 0.6 : 1,
                   boxShadow: '0 2px 8px rgba(255, 152, 0, 0.08)',
                   letterSpacing: 0.5,
                   transition: 'all 0.2s',
                   width: 'auto',
-                  minWidth: 200,
+                  minWidth: 160,
                 }}
                 onMouseOver={e => {
                   if (!(submitting || adjustFormData.items.length === 0)) {
@@ -3111,7 +3132,7 @@ const AdjustOrderModal = ({
                   }}>
                     <span style={{ fontSize: 18, fontWeight: 600, color: '#666' }}>Số lượng: {item.quantity}</span>
                     <span style={{ fontWeight: 700, color: '#ff9800', fontSize: 18 }}>
-                      {formatVND(item.subtotal)}
+                      {formatVNDForTable(item.subtotal)}
                     </span>
                   </div>
                 </div>
@@ -3135,7 +3156,7 @@ const AdjustOrderModal = ({
             
                 </div>
                 <div style={{ fontSize: 18, fontWeight: 600, color: '#263238', marginBottom: 16 }}>
-                  Tổng cộng: {formatVND(order.totalAmount)}
+                  Tổng cộng: {formatVNDForTotal(order.totalAmount)} Đồng
                 </div>
             
                 {/* Hoàn Thành Button - only show when all items are marked */}

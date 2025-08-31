@@ -150,15 +150,49 @@ const RevenuePage: React.FC = () => {
     const len = dailyRevenue.length;
     const todayTotal = len >= 1 ? dailyRevenue[len - 1].total : 0;
     const yesterdayTotal = len >= 2 ? dailyRevenue[len - 2].total : 0;
+    
+    // Debug log để kiểm tra dữ liệu
+    console.log('📊 Revenue Debug:', {
+      todayTotal,
+      yesterdayTotal,
+      todayDate: len >= 1 ? dailyRevenue[len - 1].label : 'N/A',
+      yesterdayDate: len >= 2 ? dailyRevenue[len - 2].label : 'N/A'
+    });
+    
     let changePct = 0;
+    let direction: 'up' | 'down' | 'same' = 'same';
+    
     if (yesterdayTotal === 0) {
-      changePct = todayTotal > 0 ? 100 : 0;
+      if (todayTotal > 0) {
+        changePct = 100;
+        direction = 'up';
+      } else {
+        changePct = 0;
+        direction = 'same';
+      }
     } else {
       changePct = ((todayTotal - yesterdayTotal) / yesterdayTotal) * 100;
+      if (changePct > 0) {
+        direction = 'up';
+      } else if (changePct < 0) {
+        direction = 'down';
+      } else {
+        direction = 'same';
+      }
     }
+    
+    // Không giới hạn phần trăm tăng trưởng, hiển thị số thực tế
+    
     const rounded = Math.round(changePct * 10) / 10;
-    const direction = rounded > 0 ? 'up' : rounded < 0 ? 'down' : 'same';
-    return { rounded, direction } as { rounded: number; direction: 'up' | 'down' | 'same' };
+    
+    console.log('📈 Growth Calculation:', {
+      changePct,
+      rounded,
+      direction,
+      formula: `((${todayTotal} - ${yesterdayTotal}) / ${yesterdayTotal}) * 100`
+    });
+    
+    return { rounded, direction };
   }, [dailyRevenue]);
 
   return (
@@ -173,15 +207,15 @@ const RevenuePage: React.FC = () => {
                 background: '#ff9800',
                 color: '#fff',
                 fontWeight: 600,
-                fontSize: 15,
+                fontSize: 14,
                 border: 'none',
-                borderRadius: 8,
-                padding: '8px 22px',
+                borderRadius: 6,
+                padding: '8px 18px',
                 cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(255, 152, 0, 0.08)',
-                letterSpacing: 1,
+                boxShadow: '0 2px 8px rgba(255, 152, 0, 0.12)',
+                letterSpacing: 0.5,
                 transition: 'background 0.2s',
-                minWidth: '120px',
+                minWidth: '110px',
                 textAlign: 'center',
               }}
               onMouseOver={(e) => (e.currentTarget.style.background = '#fb8c00')}
@@ -279,7 +313,7 @@ const RevenuePage: React.FC = () => {
                   <span style={{ fontSize: 36, fontWeight: 800, color: '#111827', lineHeight: 1 }}>
                     {formatCurrency(totalRevenue)}
                   </span>
-                  <span style={{ fontSize: 18, fontWeight: 700, color: '#111827' }}>VND</span>
+                  <span style={{ fontSize: 18, fontWeight: 700, color: '#111827' }}>Đồng</span>
                 </div>
                 {/* Today vs Yesterday indicator */}
                 <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -373,7 +407,7 @@ const RevenuePage: React.FC = () => {
                       borderRadius: 6,
                       animation: 'slideUp 380ms ease',
                     }}
-                    title={`${formatCurrency(d.total)} VND`}
+                    title={`${formatCurrency(d.total)} Đồng`}
                   />
                   <div style={{ marginTop: 8, fontSize: 12, color: '#6b7280' }}>{d.label}</div>
                 </div>
@@ -454,7 +488,7 @@ const RevenuePage: React.FC = () => {
                             </div>
                           </td>
                           <td className="col-amount" style={{ padding: '10px 6px', whiteSpace: 'nowrap', textAlign: 'left' }}>
-                            <div style={{ fontSize: 16, fontWeight: 'bold', color: '#111827' }}>{formatCurrency(payment.totalAmount)} VND</div>
+                            <div style={{ fontSize: 16, fontWeight: 'bold', color: '#111827' }}>{formatCurrency(payment.totalAmount)} Đồng</div>
                           </td>
                           <td className="col-time" style={{ padding: '10px 12px', whiteSpace: 'nowrap', textAlign: 'right' }}>
                             <div style={{ fontSize: 16, fontWeight: 600, color: '#111827', display: 'inline-block' }}>{formatDateTime(payment.paidAt)}</div>
@@ -556,11 +590,11 @@ const RevenuePage: React.FC = () => {
                                 <span style={{ fontSize: 16, color: '#374151', fontWeight: 600, marginLeft: 4 }}>lần gọi</span>
                               </div>
                               <div>
-                                <span style={{ fontSize: 16, fontWeight: 'bold', color: '#000' }}>{formatCurrency(food.price)} VND</span>
+                                <span style={{ fontSize: 16, fontWeight: 'bold', color: '#000' }}>{formatCurrency(food.price)} Đồng</span>
                                 <span style={{ fontSize: 16, color: '#374151', fontWeight: 600, marginLeft: 4 }}>/món</span>
                               </div>
                               <div>
-                                <span style={{ fontSize: 16, fontWeight: 'bold', color: '#000' }}>{formatCurrency(food.totalRevenue)} VND</span>
+                                <span style={{ fontSize: 16, fontWeight: 'bold', color: '#000' }}>{formatCurrency(food.totalRevenue)} Đồng</span>
                                 <span style={{ fontSize: 16, color: '#374151', fontWeight: 600, marginLeft: 4 }}>tổng</span>
                               </div>
                             </div>

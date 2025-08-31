@@ -39,7 +39,14 @@ class WebSocketService {
       console.log('🔌 Đang kết nối WebSocket...');
       this.isConnecting = true;
       
-      const base = WS_BASE_URL || window.location.origin;
+      // Handle WS_BASE_URL as array or string
+      let base: string;
+      if (Array.isArray(WS_BASE_URL)) {
+        // Use the first URL from the array
+        base = WS_BASE_URL[0];
+      } else {
+        base = WS_BASE_URL || window.location.origin;
+      }
       
       // Connect to WebSocket broker
       const wsUrl = `${base}/ws`;

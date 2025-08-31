@@ -227,12 +227,11 @@ function TablesPage() {
         <div style={{
           width: '100%',
           maxWidth: '100%',
-          display: 'flex',
-          justifyContent: 'flex-start',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, 1fr)',
+          gap: isMobile ? '0.75rem' : '2rem',
+          justifyContent: 'center',
           alignItems: 'center',
-          position: 'relative',
-          marginLeft: isMobile ? 35 : 16,
-          gap: isMobile ? '0.75rem' : '2rem'
         }}>
         <button
           onClick={() => navigate('/orders')}
@@ -248,12 +247,14 @@ function TablesPage() {
             boxShadow: '0 2px 8px rgba(255, 152, 0, 0.08)',
             letterSpacing: 1,
             transition: 'background 0.2s',
+            justifySelf: 'center',
           }}
           onMouseOver={e => (e.currentTarget.style.background = '#fb8c00')}
           onMouseOut={e => (e.currentTarget.style.background = '#ff9800')}
         >
           Đơn Hàng
         </button>
+        <div></div>
         </div>
       </div>
       
