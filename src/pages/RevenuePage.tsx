@@ -247,9 +247,9 @@ const RevenuePage: React.FC = () => {
               <span
                 className="refresh-icon"
                 style={{
-                  fontSize: 26,
+                  fontSize: 19,
                   lineHeight: 1,
-                  fontWeight: 700,
+                  fontWeight: 600,
                   color: '#0f172a',
                   fontFamily: "'Segoe UI Symbol','Noto Sans Symbols','Arial Unicode MS',system-ui,sans-serif",
                   userSelect: 'none',
