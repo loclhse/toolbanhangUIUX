@@ -31,6 +31,21 @@ const OrderModal: React.FC<OrderModalProps> = ({ open, tableId, tableIds = [], o
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  // Disable body scroll when modal is open
+  useEffect(() => {
+    if (open) {
+      // Save original overflow
+      const originalOverflow = document.body.style.overflow;
+      // Disable scroll
+      document.body.style.overflow = 'hidden';
+      
+      return () => {
+        // Restore original overflow when modal closes
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [open]);
+
   // Fetch food items when modal opens
   useEffect(() => {
     if (open) {
@@ -146,7 +161,15 @@ const OrderModal: React.FC<OrderModalProps> = ({ open, tableId, tableIds = [], o
   const isMobile = window.innerWidth <= 768;
 
   return (
-    <div style={isMobile ? styles.mobileOverlay : styles.overlay}>
+    <div 
+      style={isMobile ? styles.mobileOverlay : styles.overlay}
+      onClick={(e) => {
+        // Only close if clicking on the overlay itself, not on the modal content
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div style={{
         ...(contained 
           ? (isMobile ? styles.mobileContainedModal : styles.containedModal)
@@ -446,10 +469,11 @@ const styles: { [key: string]: React.CSSProperties } = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 1000,
+    zIndex: 9999,
     fontFamily: 'Segoe UI, Arial, sans-serif',
     padding: '20px',
     boxSizing: 'border-box',
+    isolation: 'isolate',
   },
   mobileOverlay: {
     position: 'fixed',
@@ -461,23 +485,25 @@ const styles: { [key: string]: React.CSSProperties } = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 1000,
+    zIndex: 9999,
     fontFamily: 'Segoe UI, Arial, sans-serif',
-    padding: '20px',
+    padding: '25px',
     boxSizing: 'border-box',
+    isolation: 'isolate',
   },
   modal: {
     background: '#fff',
     borderRadius: 16,
     width: '90%',
     maxWidth: '380px',
-    maxHeight: '80vh',
+    maxHeight: '450px',
     boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
     position: 'relative',
     fontFamily: 'Segoe UI, Arial, sans-serif',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
+    pointerEvents: 'auto',
   },
   mobileModal: {
     background: '#fff',
@@ -491,11 +517,12 @@ const styles: { [key: string]: React.CSSProperties } = {
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
+    pointerEvents: 'auto',
   },
   mobileMenuItem: {
     display: 'flex',
     alignItems: 'center',
-    padding: '8px',
+    padding: '15px',
     marginBottom: '6px',
     background: '#fff',
     borderRadius: '12px',
@@ -504,16 +531,17 @@ const styles: { [key: string]: React.CSSProperties } = {
     minHeight: '64px',
     border: '1px solid #f0f0f0',
     width: '100%',
+    justifyContent: 'flex-start',
   },
   mobileFoodImage: {
-    width: '64px',
+    width: '60px',
     height: '64px',
     objectFit: 'cover',
     borderRadius: '8px',
     flexShrink: 0,
   },
   mobileFoodName: {
-    fontSize: '18px',
+    fontSize: '16px',
     fontWeight: 700,
     color: '#111827',
     marginBottom: '6px',
@@ -525,7 +553,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     wordWrap: 'break-word',
   },
   mobileFoodPrice: {
-    fontSize: '16px',
+    fontSize: '15px',
     fontWeight: 800,
     color: '#000000',
     whiteSpace: 'normal',
@@ -562,10 +590,11 @@ const styles: { [key: string]: React.CSSProperties } = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 1000,
+    zIndex: 9999,
     fontFamily: 'Segoe UI, Arial, sans-serif',
     padding: '20px',
     boxSizing: 'border-box',
+    isolation: 'isolate',
   },
   containedModal: {
     background: '#fff',
@@ -579,6 +608,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     border: '2px solid #ff9800',
     position: 'relative',
     fontFamily: 'Segoe UI, Arial, sans-serif',
+    pointerEvents: 'auto',
   },
   mobileContainedModal: {
     background: '#fff',
@@ -592,6 +622,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     border: 'none',
     position: 'relative',
     fontFamily: 'Segoe UI, Arial, sans-serif',
+    pointerEvents: 'auto',
   },
   header: {
     padding: '20px 24px 16px 24px',
@@ -703,7 +734,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     flexDirection: 'column',
   },
   menuTitle: {
-    fontSize: '20px',
+    fontSize: '18px',
     fontWeight: 700,
     color: '#263238',
     margin: '0',
@@ -713,8 +744,8 @@ const styles: { [key: string]: React.CSSProperties } = {
     flex: 1,
     overflowY: 'auto',
     padding: '17px',
-    maxHeight: '300px',
-    minHeight: '240px',
+    maxHeight: '250px',
+    minHeight: '150px',
     border: '1px solid #e0e0e0',
     borderRadius: 12,
     position: 'relative',
@@ -858,10 +889,11 @@ const styles: { [key: string]: React.CSSProperties } = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 1000,
+    zIndex: 10000,
     fontFamily: 'Segoe UI, Arial, sans-serif',
     padding: '20px',
     boxSizing: 'border-box',
+    isolation: 'isolate',
   },
   successBanner: {
     background: '#f0f9f0',
@@ -899,4 +931,4 @@ const styles: { [key: string]: React.CSSProperties } = {
   },
 };
 
-export default OrderModal; 
+export default OrderModal;

@@ -153,6 +153,21 @@ const OrdersPage: React.FC = () => {
     }
   }, [location.state, location.pathname, navigate]);
 
+  // Disable body scroll when overlays are open
+  useEffect(() => {
+    if (showAdjustForm || showMarkOverlay || showPaymentOptions) {
+      // Save original overflow
+      const originalOverflow = document.body.style.overflow;
+      // Disable scroll
+      document.body.style.overflow = 'hidden';
+      
+      return () => {
+        // Restore original overflow when overlays close
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [showAdjustForm, showMarkOverlay, showPaymentOptions]);
+
   // Auto-dismiss success banner after 3 seconds
   useEffect(() => {
     if (notification?.type === 'success') {
@@ -2204,20 +2219,28 @@ const AdjustOrderModal = ({
   if (!open) return null;
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1500,
-      padding: '20px',
-      overflowY: 'auto',
-    }}>
+    <div 
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999,
+        padding: '20px',
+        overflowY: 'auto',
+        isolation: 'isolate',
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div style={{
         background: '#fff',
         borderRadius: 12,
@@ -2916,19 +2939,27 @@ const AdjustOrderModal = ({
     const totalItems = order.items.length;
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1500,
-      padding: '20px',
-    }}>
+    <div 
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999,
+        padding: '20px',
+        isolation: 'isolate',
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div style={{
         background: '#fff',
         borderRadius: 12,
