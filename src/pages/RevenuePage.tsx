@@ -244,19 +244,22 @@ const RevenuePage: React.FC = () => {
                 transition: 'transform 0.2s ease, box-shadow 0.2s ease',
               }}
             >
-              <span
-                className="refresh-icon"
-                style={{
-                  fontSize: 19,
-                  lineHeight: 1,
-                  fontWeight: 600,
-                  color: '#0f172a',
-                  fontFamily: "'Segoe UI Symbol','Noto Sans Symbols','Arial Unicode MS',system-ui,sans-serif",
-                  userSelect: 'none',
-                }}
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#0f172a"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ userSelect: 'none' }}
               >
-                ⭮
-              </span>
+                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                <path d="M21 3v5h-5" />
+                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                <path d="M3 21v-5h5" />
+              </svg>
             </button>
           </div>
         </div>
